@@ -16,7 +16,8 @@
     "db:push": "npm run push -w @dealos/db",
     "test:static": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/marketplace-smoke.mjs",
-    "db:deploy": "npm run migrate:deploy -w @dealos/db"
+    "db:deploy": "npm run migrate:deploy -w @dealos/db",
+    "auth:bootstrap-reviewer": "node --env-file-if-exists=.env scripts/create-reviewer.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

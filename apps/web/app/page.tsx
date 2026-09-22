@@ -37,7 +37,7 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <Link href="/marketplace" className="button lime">Browse businesses</Link>
-              <Link href="/register?role=SELLER" className="button light">Sell your business</Link>
+              <Link href="/register?account=SELLER" className="button light">Sell your business</Link>
             </div>
           </div>
           <div className="hero-trust">
@@ -89,8 +89,8 @@ export default function Home() {
           <p>Create an account as a buyer or seller and continue from one secure workspace.</p>
         </div>
         <div className="public-actions">
-          <Link href="/register?role=BUYER" className="button lime">I want to buy</Link>
-          <Link href="/register?role=SELLER" className="button light">I want to sell</Link>
+          <Link href="/register?account=BUYER" className="button lime">I want to buy</Link>
+          <Link href="/register?account=SELLER" className="button light">I want to sell</Link>
         </div>
       </section>
       <PublicFooter />

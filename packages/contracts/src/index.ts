@@ -66,6 +66,14 @@ export const createListingSchema = z.object({
   litigationOpen: z.boolean(),
 });
 
+export const dataRoomUploadSchema = z.object({
+  listingId: z.string().uuid(),
+  name: z.string().trim().min(2).max(150),
+  category: z.enum(["Financial","Customers","Legal","Technical","Operations"]),
+  contentType: z.enum(["application/pdf","image/png","image/jpeg","text/csv"]),
+  dataBase64: z.string().min(12).max(5_600_000),
+});
+
 export const evidenceUploadSchema = z.object({
   category: z.enum(["IDENTITY", "BUSINESS", "REVENUE"]),
   documentType: z.enum([

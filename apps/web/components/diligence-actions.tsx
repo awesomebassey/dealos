@@ -2,15 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { actors, type DemoRole } from "../lib/actors";
+import { toast } from "sonner";
+import { clientApi } from "../lib/client-api";
 
-export function DiligenceActions({ dealId, role }: { dealId: string; role: DemoRole }) {
-  const router = useRouter(); const [busy, setBusy] = useState(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export function DiligenceActions({ dealId }: { dealId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
   async function run() {
     setBusy(true);
-    await fetch(`${apiUrl}/api/diligence/deals/${dealId}/run`, { method: "POST", headers: { "x-demo-actor": actors[role].id } });
-    setBusy(false); router.refresh();
+    try {
+      await clientApi(`/diligence/deals/${dealId}/run`, { method: "POST" });
+      toast.success("Diligence review updated");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to run diligence review");
+    } finally {
+      setBusy(false);
+    }
   }
-  return <button className="button" disabled={busy} onClick={run}>{busy ? "Reviewing..." : "Run diligence review"}</button>;
+
+  return <button className="button" disabled={busy} onClick={run}>{busy ? "Reviewing" : "Refresh diligence review"}</button>;
 }

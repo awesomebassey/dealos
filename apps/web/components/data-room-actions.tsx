@@ -1,27 +1,32 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { actors, type DemoRole } from "../lib/actors";
+import { toast } from "sonner";
+import { clientApi } from "../lib/client-api";
 
-export function DataRoomAction({ documentId, dealId, role }: { documentId: string; dealId: string; role: DemoRole }) {
-  const [result, setResult] = useState<string | null>(null);
+export function DataRoomAction({ documentId, dealId }: { documentId: string; dealId: string }) {
   const [busy, setBusy] = useState(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
   async function open() {
-    setBusy(true); setResult(null);
-    const response = await fetch(`${apiUrl}/api/data-room/documents/${documentId}/access?dealId=${dealId}`, {
-      method: "POST",
-      headers: { "x-demo-actor": actors[role].id },
-    });
-    if (response.ok) {
-      const data = await response.json();
-      setResult(`Access granted for ${data.expiresInSeconds / 60} minutes`);
-    } else {
-      setResult("Access denied");
+    setBusy(true);
+    try {
+      const data = await clientApi<{ signedUrl: string }>(
+        `/data-room/documents/${documentId}/access?dealId=${dealId}`,
+        { method: "POST" },
+      );
+      toast.success("Document access recorded");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to open document");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
-  return <div style={{ textAlign: "right" }}><button className="button secondary" disabled={busy} onClick={open}>Open</button>{result && <div className="stat-foot">{result}</div>}</div>;
+  return (
+    <button className="button secondary" disabled={busy} onClick={open}>
+      {busy ? "Opening" : "Open"} <ExternalLink size={14}/>
+    </button>
+  );
 }

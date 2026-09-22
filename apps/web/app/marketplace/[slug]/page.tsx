@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, FileLock2, ShieldCheck, TrendingUp } from "lucide-react";
-import { money, optionalCurrentUser, publicApi } from "../../../lib/api";
+import { api, money, optionalCurrentUser, publicApi } from "../../../lib/api";
 import { PublicFooter, PublicHeader } from "../../../components/public-header";
 import { StartDealButton } from "../../../components/start-deal-button";
 
@@ -24,6 +24,7 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
     optionalCurrentUser(),
   ]);
 
+  const verification = user?.role==="BUYER" ? await api<{identityVerified:boolean}>("/kyc/me") : null;
   const next = encodeURIComponent(`/marketplace/${listing.slug}`);
 
   return (
@@ -37,10 +38,11 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
         <div className="page-head">
           <div>
             <h1>{listing.name}</h1>
-            <p>{listing.category} / Verified Nigerian digital business</p>
+            <p>{listing.category} / Nigerian digital business</p>
           </div>
           {user?.role === "BUYER" ? (
-            <StartDealButton slug={listing.slug}/>
+            verification?.identityVerified?<StartDealButton slug={listing.slug}/>:
+              <Link className="button" href="/kyc/identity">Complete sample identity verification</Link>
           ) : user ? (
             <Link href="/dashboard" className="button">Open your workspace</Link>
           ) : (

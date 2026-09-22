@@ -17,7 +17,8 @@
     "test:static": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/marketplace-smoke.mjs",
     "db:deploy": "npm run migrate:deploy -w @dealos/db",
-    "auth:bootstrap-reviewer": "node --env-file-if-exists=.env scripts/create-reviewer.mjs"
+    "auth:bootstrap-reviewer": "node --env-file-if-exists=.env scripts/create-reviewer.mjs",
+    "test:web-smoke": "node --test tests/web-route-smoke.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

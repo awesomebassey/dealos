@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { sellerDiligenceAnswerSchema } from "@dealos/contracts";
 import { FindingSeverity, Prisma, User, UserRole } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -115,8 +116,43 @@ export class DiligenceService {
     return serialize({ findings, questions });
   }
 
+  async answer(dealId: string, questionId: string, actor: User, payload: unknown) {
+    const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.SELLER || deal.listing.organizationId !== actor.organizationId) {
+      throw new ForbiddenException("Only this business's seller can answer diligence questions");
+    }
+    if (deal.stage !== "DILIGENCE" && deal.stage !== "FULL_DILIGENCE") {
+      throw new ConflictException("Diligence questions are not open at this transaction stage");
+    }
+    const input = sellerDiligenceAnswerSchema.parse(payload);
+    return this.prisma.$transaction(async tx => {
+      const question = await tx.dueDiligenceQuestion.findFirst({
+        where: { id: questionId, dealId },
+      });
+      if (!question) throw new NotFoundException("Diligence question not found");
+      const updated = await tx.dueDiligenceQuestion.update({
+        where: { id: questionId }, data: { answer: input.answer },
+      });
+      await this.audit.create({
+        dealId, actor, resourceType: "DUE_DILIGENCE_QUESTION", resourceId: questionId,
+        action: "SELLER_ANSWERED_QUESTION",
+        metadata: { summary: "Seller provided a diligence response" },
+        correlationId: randomUUID(),
+      }, tx);
+      await tx.outboxEvent.create({
+        data: { topic: "diligence.question_answered", aggregateId: dealId,
+          payload: { dealId, questionId } },
+      });
+      return serialize(updated);
+    });
+  }
+
   async run(dealId: string, actor: User) {
     const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.ADVISOR && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Only a deal advisor can run the diligence review");
+    }
+    if (deal.stage === "WITHDRAWN") throw new ConflictException("This acquisition has ended");
     const results = this.evaluate(deal.listing);
     const correlationId = randomUUID();
 

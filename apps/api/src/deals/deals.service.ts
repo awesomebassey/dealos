@@ -21,7 +21,7 @@ export class DealsService {
   ) {}
 
   private async assertParticipant(dealId: string, actor: User) {
-    if (([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role)) return;
+    if (actor.role === UserRole.ADMIN) return;
     const participant = await this.prisma.dealParticipant.findUnique({
       where: { dealId_userId: { dealId, userId: actor.id } },
     });
@@ -30,7 +30,7 @@ export class DealsService {
 
   async list(actor: User) {
     const deals = await this.prisma.deal.findMany({
-      where: ([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role)
+      where: actor.role === UserRole.ADMIN
         ? undefined
         : { participants: { some: { userId: actor.id } } },
       include: {
@@ -133,6 +133,7 @@ export class DealsService {
     if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role)) {
       throw new ForbiddenException("Only a deal advisor can move the pipeline");
     }
+    await this.assertParticipant(id, actor);
     const input = transitionDealSchema.parse(payload);
     const correlationId = randomUUID();
 

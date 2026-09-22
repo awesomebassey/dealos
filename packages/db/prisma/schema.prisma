@@ -139,6 +139,7 @@ model User {
   wallet         WalletAccount?
   submittedOffers AcquisitionOffer[]
   buyerDeals      Deal[] @relation("DealBuyer")
+  notifications    Notification[]
   createdAt      DateTime          @default(now())
 }
 
@@ -486,4 +487,19 @@ model OutboxEvent {
   createdAt   DateTime     @default(now())
 
   @@index([status, availableAt])
+}
+
+model Notification {
+  id            String   @id @default(uuid())
+  recipientId   String
+  recipient     User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  sourceEventId String
+  title         String
+  description   String
+  href          String
+  readAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([recipientId, sourceEventId])
+  @@index([recipientId, readAt, createdAt])
 }

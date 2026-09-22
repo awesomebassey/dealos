@@ -9,7 +9,7 @@ export default async function Dashboard() {
   const findings = deals.flatMap((deal) => deal.findings ?? []);
   const high = findings.filter((finding) => ["HIGH", "CRITICAL"].includes(finding.severity)).length;
   const funded = deals.filter((deal) => ["FUNDED", "VERIFICATION", "RELEASE_PENDING"].includes(deal.escrow?.status ?? "")).length;
-  const first = deals[0];
+  const portfolioValue=deals.reduce((sum,deal)=>sum+BigInt(deal.agreedPriceMinor??0),0n);
 
   const roleCopy = user.role === "SELLER"
     ? {
@@ -17,8 +17,8 @@ export default async function Dashboard() {
         description: "Track buyer activity, confidential review, transaction progress and closing from one place.",
         emptyTitle: "Your business sale starts here",
         emptyText: "Complete verification and prepare your listing before buyer conversations begin.",
-        action: "Complete verification",
-        href: "/kyc",
+        action: "Manage my businesses",
+        href: "/my-listings",
       }
     : user.role === "BUYER"
       ? {
@@ -60,7 +60,7 @@ export default async function Dashboard() {
             <div className="card card-pad"><div className="kpi"><div className="kpi-icon"><Handshake size={18}/></div><div><div className="stat-label">Active deals</div><div className="stat-value">{active.length}</div></div></div><div className="stat-foot">Transactions currently in progress</div></div>
             <div className="card card-pad"><div className="kpi"><div className="kpi-icon"><AlertTriangle size={18}/></div><div><div className="stat-label">Priority findings</div><div className="stat-value">{high}</div></div></div><div className="stat-foot">High-risk diligence items still open</div></div>
             <div className="card card-pad"><div className="kpi"><div className="kpi-icon"><Landmark size={18}/></div><div><div className="stat-label">Funded escrows</div><div className="stat-value">{funded}</div></div></div><div className="stat-foot">Deals awaiting transfer or release</div></div>
-            <div className="card card-pad"><div className="kpi"><div className="kpi-icon"><BadgeCheck size={18}/></div><div><div className="stat-label">Current deal value</div><div className="stat-value">{first ? money(first.agreedPriceMinor) : "₦0"}</div></div></div><div className="stat-foot">Agreed consideration in Naira</div></div>
+            <div className="card card-pad"><div className="kpi"><div className="kpi-icon"><BadgeCheck size={18}/></div><div><div className="stat-label">Total agreed deal value</div><div className="stat-value">{money(portfolioValue)}</div></div></div><div className="stat-foot">Agreed consideration in Naira</div></div>
           </div>
 
           <div className="grid two" style={{ marginTop: 16 }}>

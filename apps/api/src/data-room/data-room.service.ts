@@ -23,6 +23,7 @@ export class DataRoomService {
  private async accessContext(dealId:string,actor:User) {
   const deal=await this.prisma.deal.findUnique({where:{id:dealId},include:{participants:true,ndaAgreements:true}});
   if(!deal) throw new NotFoundException("Deal not found");
+  if(deal.stage==="WITHDRAWN") throw new ForbiddenException("Access to withdrawn acquisitions has ended");
   const participant=deal.participants.some(p=>p.userId===actor.id);
   if(!(actor.role === UserRole.ADMIN || actor.role === UserRole.ADVISOR) && !participant) throw new ForbiddenException("Not a participant in this acquisition");
   const signed=deal.ndaAgreements.some(n=>n.userId===actor.id && n.status===NdaStatus.SIGNED);

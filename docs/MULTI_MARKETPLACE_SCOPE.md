@@ -24,3 +24,20 @@ Seed at least 10 unrelated sellers/listings, optionally generate 100. Search/pag
 
 ## Rollout and validation
 Migration additive. Run `npm ci`, Prisma generate and database push/migrate against a disposable database, seed, static UI tests, API unit/integration tests, production builds and a full buyer/seller/advisor smoke test. Do not run the destructive seed against a real shared or production database.
+
+## Fresh installation without seeded accounts
+After applying migrations to a new database, create the first advisor with the one-time first-party CLI, without invoking the destructive seed. Set `DEALOS_BOOTSTRAP_REVIEWER=true` only for the command, along with `DEALOS_REVIEWER_NAME` and `DEALOS_REVIEWER_EMAIL`. Supply `DEALOS_REVIEWER_PASSWORD` through a hidden shell prompt, not in a committed env file. Run `npm run auth:bootstrap-reviewer`, then unset the password and the bootstrap flag. The operation refuses to run when any advisor or admin already exists and never promotes an existing account.
+
+Example:
+```bash
+read -s DEALOS_REVIEWER_PASSWORD
+echo
+DEALOS_BOOTSTRAP_REVIEWER=true \
+DEALOS_REVIEWER_NAME="Deal Reviewer" \
+DEALOS_REVIEWER_EMAIL="reviewer@example.com" \
+DEALOS_REVIEWER_PASSWORD="$DEALOS_REVIEWER_PASSWORD" \
+npm run auth:bootstrap-reviewer
+unset DEALOS_REVIEWER_PASSWORD
+```
+
+This is an initial trust-root operation. Do not grant reviewer privileges through the normal buyer/seller registration API. Restrict production database access and rotate the initial password after setup.

@@ -138,6 +138,7 @@ model User {
   resetTokens    PasswordResetToken[]
   wallet         WalletAccount?
   submittedOffers AcquisitionOffer[]
+  buyerDeals      Deal[] @relation("DealBuyer")
   createdAt      DateTime          @default(now())
 }
 
@@ -208,6 +209,8 @@ model Deal {
   ref                 String                @unique
   listingId           String
   listing             Listing               @relation(fields: [listingId], references: [id])
+  buyerId             String?
+  buyer               User?                  @relation("DealBuyer", fields: [buyerId], references: [id])
   stage               DealStage             @default(NDA_PENDING)
   version             Int                   @default(0)
   agreedPriceMinor    BigInt?
@@ -224,6 +227,9 @@ model Deal {
   walletTransactions  WalletTransaction[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId, updatedAt])
 }
 
 model DealParticipant {

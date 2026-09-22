@@ -36,8 +36,8 @@ export default async function Marketplace() {
                 <div className="list-row"><span className="muted">Annual revenue</span><strong>{money(listing.annualRevenueMinor)}</strong></div>
                 <div className="list-row"><span className="muted">Recurring revenue</span><strong>{listing.recurringRevenuePct}%</strong></div>
               </div>
-              <Link href="/register?account=BUYER" className="button full" style={{ marginTop: 22 }}>
-                View acquisition path <ArrowRight size={15}/>
+              <Link href={`/marketplace/${listing.slug}`} className="button full" style={{ marginTop: 22 }}>
+                View business <ArrowRight size={15}/>
               </Link>
             </article>
           ))}

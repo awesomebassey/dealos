@@ -138,6 +138,16 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
       ["REVENUE","BANK_STATEMENT"],["REVENUE","PROFIT_LOSS"],
     ];
     for(const [category,kind] of sellerEvidence)await seller.post("/kyc/evidence",evidence(category,kind));
+    const sellerCase=await seller.get("/kyc/me");
+    const sellerSampleId=sellerCase.evidence.find(item=>item.category==="IDENTITY")?.id;
+    assert.ok(sellerSampleId,"seller identity sample must exist");
+    await publicClient.blocked("GET","/kyc/evidence/"+sellerSampleId+"/sample",401);
+    await buyer.blocked("GET","/kyc/evidence/"+sellerSampleId+"/sample",403);
+    const advisorSample=await advisor.request("GET","/kyc/evidence/"+sellerSampleId+"/sample");
+    assert.equal(advisorSample.status,200);
+    assert.match(advisorSample.data,/Synthetic, fabricated verification test only/);
+    const ownerSample=await seller.request("GET","/kyc/evidence/"+sellerSampleId+"/sample");
+    assert.equal(ownerSample.status,200);
     const queue=await advisor.get("/kyc/review-queue");
     assert.ok(queue.some(item=>item.user.id===buyerUser.id));
     assert.ok(queue.some(item=>item.user.id===sellerUser.id));
@@ -191,6 +201,10 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
     assert.deepEqual(mainDocs.map(doc=>doc.id),[financialDocId]);
     const access=await buyer.post("/data-room/documents/"+financialDocId+"/access?dealId="+mainDeal.id);
     assert.ok(access.signedUrl.includes("/api/data-room/documents/"));
+    const sameOriginPath=access.signedUrl.replace(/^\\/api/,"");
+    const downloaded=await buyer.request("GET",sameOriginPath);
+    assert.equal(downloaded.status,200);
+    assert.match(downloaded.data,/SYNTHETIC TEST ONLY/);
     await publicClient.blocked("GET","/data-room/documents/"+financialDocId+
       "/download?dealId="+mainDeal.id,401);
     const differentDeal=await buyer.post("/listings/sample-business-001/start-deal");

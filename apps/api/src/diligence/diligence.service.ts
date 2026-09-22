@@ -29,7 +29,7 @@ export class DiligenceService {
     });
     if (!deal) throw new NotFoundException("Deal not found");
     const participant = deal.participants.some((p) => p.userId === actor.id);
-    if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role) && !participant) {
+    if (actor.role !== UserRole.ADMIN && !participant) {
       throw new ForbiddenException("You do not have access to this deal");
     }
     return deal;

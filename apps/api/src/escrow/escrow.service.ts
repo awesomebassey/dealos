@@ -189,7 +189,7 @@ export class EscrowService {
       // Lock the escrow row so simultaneous buyer and seller sign-offs never overwrite each other.
       await tx.$queryRaw`SELECT "id" FROM "EscrowAccount" WHERE "dealId" = ${dealId} FOR UPDATE`;
       const escrow = await tx.escrowAccount.findUniqueOrThrow({ where: { dealId } });
-      if (![EscrowStatus.FUNDED, EscrowStatus.VERIFICATION, EscrowStatus.RELEASE_PENDING].includes(escrow.status)) {
+      if (!([EscrowStatus.FUNDED, EscrowStatus.VERIFICATION, EscrowStatus.RELEASE_PENDING] as EscrowStatus[]).includes(escrow.status)) {
         throw new ConflictException("Escrow cannot accept completion sign-off in its current state");
       }
       if (escrow.disputedAt) throw new ConflictException("Resolve the escrow dispute before sign-off");

@@ -253,8 +253,10 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
   let topupKey="smoke-topup-"+unique;
   let fundKey="smoke-fund-"+unique;
   await t.test("Demo wallet funding and escrow are replay safe",async()=>{
-    const original=await buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},topupKey);
-    const replay=await buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},topupKey);
+    const [original,replay]=await Promise.all([
+      buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},topupKey),
+      buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},topupKey),
+    ]);
     assert.equal(replay.id,original.id);
     const initialWallet=await buyer.get("/wallet");
     assert.equal(initialWallet.balanceMinor,String(190_000_000));
@@ -291,9 +293,17 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
     assert.ok(pending.buyerSignedOffAt&&pending.sellerSignedOffAt);
     await advisor.post("/escrow/deals/"+mainDeal.id+"/platform-confirm");
     const releaseKey="smoke-release-"+unique;
-    const released=await advisor.post("/escrow/deals/"+mainDeal.id+"/release",undefined,releaseKey);
-    const replayed=await advisor.post("/escrow/deals/"+mainDeal.id+"/release",undefined,releaseKey);
-    assert.equal(released.id,replayed.id);
+    const [firstRelease,secondRelease]=await Promise.all([
+      advisor.request("POST","/escrow/deals/"+mainDeal.id+"/release",undefined,releaseKey),
+      advisor.request("POST","/escrow/deals/"+mainDeal.id+"/release",undefined,"parallel-release-"+unique),
+    ]);
+    const outcomes=[firstRelease,secondRelease];
+    assert.equal(outcomes.filter(r=>r.status>=200&&r.status<300).length,1);
+    assert.equal(outcomes.filter(r=>r.status===409).length,1);
+    const successful=outcomes.find(r=>r.status>=200&&r.status<300);
+    const winningKey=firstRelease===successful?releaseKey:"parallel-release-"+unique;
+    const replayed=await advisor.post("/escrow/deals/"+mainDeal.id+"/release",undefined,winningKey);
+    assert.equal(replayed.id,successful.data.id);
     await advisor.blocked("POST","/escrow/deals/"+mainDeal.id+"/release",409,undefined,
       "second-release-"+unique);
     await advisor.blocked("POST","/escrow/deals/"+mainDeal.id+"/platform-confirm",409);

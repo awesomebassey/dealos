@@ -77,7 +77,7 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
               <div className="list-row"><span className="muted">Business</span><strong>{listing.organization.name}</strong></div>
               <div className="list-row"><span className="muted">Revenue concentration</span><strong>{listing.customerConcentration}% largest customer</strong></div>
               <div className="list-row"><span className="muted">Confidential records</span><strong>NDA required</strong></div>
-              <div className="list-row"><span className="muted">Settlement</span><strong>Protected escrow</strong></div>
+              <div className="list-row"><span className="muted">Settlement</span><strong>Simulated escrow</strong></div>
             </div>
           </section>
         </div>

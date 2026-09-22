@@ -1,4 +1,4 @@
 export function Severity({ value }: { value: string }) {
-  const klass = value === "CRITICAL" || value === "HIGH" ? "danger" : value === "MEDIUM" ? "warn" : "";
-  return <span className={`badge ${klass}`}>{value.toLowerCase()}</span>;
+  const level = value.toLowerCase();
+  return <span className={`severity ${level}`}>{level}</span>;
 }

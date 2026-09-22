@@ -9,7 +9,7 @@ export function PublicHeader() {
       </Link>
       <nav className="public-nav" aria-label="Main navigation">
         <Link href="/marketplace">Buy a business</Link>
-        <Link href="/register?role=SELLER">Sell a business</Link>
+        <Link href="/register?account=SELLER">Sell a business</Link>
         <Link href="/#how-it-works">How it works</Link>
       </nav>
       <div className="public-actions">

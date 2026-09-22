@@ -227,8 +227,15 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
         to:stage,expectedVersion:deal.version,
       });
       assert.equal(deal.stage,stage);
+      if(stage==="FULL_DILIGENCE"){
+        await advisor.post("/diligence/deals/"+mainDeal.id+"/run");
+        const findings=await advisor.get("/diligence/deals/"+mainDeal.id);
+        assert.ok(Array.isArray(findings.findings));
+        assert.ok(Array.isArray(findings.questions));
+      }
     }
-    assert.equal(deal.escrow?.status,undefined); // Transition returns the deal without related includes.
+    const reviewed=await advisor.get("/deals/"+mainDeal.id);
+    assert.equal(reviewed.stage,"ESCROW");
     const escrow=await advisor.get("/escrow/deals/"+mainDeal.id);
     assert.equal(escrow.status,"CREATED");
   });
@@ -261,6 +268,7 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
       to:"ASSET_TRANSFER",expectedVersion:deal.version,
     });
     assert.equal(deal.stage,"ASSET_TRANSFER");
+    deal=await advisor.get("/deals/"+mainDeal.id);
     assert.ok(deal.assetItems?.length>0);
     for(const item of deal.assetItems){
       await buyer.post("/deals/"+mainDeal.id+"/assets/"+item.id+"/confirm");

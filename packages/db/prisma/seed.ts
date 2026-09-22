@@ -10,14 +10,20 @@ import {
 } from "@prisma/client";
 import { config } from "dotenv";
 import { resolve } from "node:path";
-import { randomBytes, scrypt as scryptCallback } from "node:crypto";
-import { promisify } from "node:util";
+import { randomBytes, scrypt } from "node:crypto";
 
-const scrypt = promisify(scryptCallback);
+function deriveSeedPassword(password: string, salt: Buffer) {
+  return new Promise<Buffer>((resolveKey, reject) => {
+    scrypt(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, key) => {
+      if (error) reject(error);
+      else resolveKey(key);
+    });
+  });
+}
 
 async function demoPasswordHash(password: string) {
   const salt = randomBytes(16);
-  const key = (await scrypt(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 })) as Buffer;
+  const key = await deriveSeedPassword(password, salt);
   return ["scrypt", 32768, 8, 1, salt.toString("base64url"), key.toString("base64url")].join("$");
 }
 

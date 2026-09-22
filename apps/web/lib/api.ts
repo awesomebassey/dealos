@@ -36,6 +36,18 @@ export function currentUser() {
   return api<CurrentUser>("/auth/me");
 }
 
+export async function optionalCurrentUser(): Promise<CurrentUser | null> {
+  const store = await cookies();
+  const cookieHeader = store.toString();
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    cache: "no-store",
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) return null;
+  return response.json() as Promise<CurrentUser>;
+}
+
 export async function publicApi<T>(path: string): Promise<T> {
   const response = await fetch(`${API_URL}/api${path}`, { cache: "no-store" });
   if (!response.ok) {

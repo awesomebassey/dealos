@@ -8,7 +8,7 @@ import { serialize } from "../common/serialize";
 export class WalletService {
   constructor(private readonly prisma:PrismaService){}
   async get(actor:User){
-    if(![UserRole.BUYER,UserRole.SELLER].includes(actor.role)) throw new ForbiddenException("Buyer or seller account required");
+    if(!(actor.role === UserRole.BUYER || actor.role === UserRole.SELLER)) throw new ForbiddenException("Buyer or seller account required");
     const wallet=await this.prisma.walletAccount.upsert({where:{userId:actor.id},create:{userId:actor.id},update:{}});
     return serialize(await this.prisma.walletAccount.findUniqueOrThrow({
       where:{id:wallet.id},include:{transactions:{orderBy:{createdAt:"desc"},take:30,include:{deal:{select:{ref:true,listing:{select:{name:true}}}}}}},

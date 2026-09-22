@@ -13,12 +13,12 @@ import type { User } from "@prisma/client";
 import { Observable, concatMap, from, interval, map, switchMap } from "rxjs";
 import { DealsService } from "./deals.service";
 import { AuditService } from "../audit/audit.service";
-import { DemoAuthGuard } from "../auth/demo-auth.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { Actor } from "../auth/actor.decorator";
 import { serialize } from "../common/serialize";
 
 @Controller("deals")
-@UseGuards(DemoAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class DealsController {
   constructor(
     private readonly deals: DealsService,

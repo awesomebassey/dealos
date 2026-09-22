@@ -195,7 +195,6 @@ a { color: inherit; text-decoration: none; }
 .nav { display:grid; gap:3px; }
 .nav a { display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:7px; color:#b9cac2; font-size:13px; font-weight:600; }
 .nav a:hover, .nav a.active { background:rgba(255,255,255,.09); color:#fff; }
-.nav a.active { box-shadow:inset 3px 0 0 var(--lime); }
 .sidebar-foot { margin-top:auto; padding:18px 10px 4px; color:#829c90; font-size:12px; line-height:1.6; border-top:1px solid rgba(255,255,255,.1); }
 .workspace-main { min-width:0; }
 .topbar {

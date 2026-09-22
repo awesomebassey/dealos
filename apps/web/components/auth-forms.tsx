@@ -80,7 +80,7 @@ export function LoginForm() {
 export function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const requestedRole = params.get("role");
+  const requestedRole = params.get("account");
   const [role, setRole] = useState(requestedRole === "SELLER" ? "SELLER" : "BUYER");
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);

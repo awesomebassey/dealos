@@ -9,7 +9,10 @@ export class WalletService {
   constructor(private readonly prisma:PrismaService){}
   async get(actor:User){
     if(!(actor.role === UserRole.BUYER || actor.role === UserRole.SELLER)) throw new ForbiddenException("Buyer or seller account required");
-    const wallet=await this.prisma.walletAccount.upsert({where:{userId:actor.id},create:{userId:actor.id},update:{}});
+    await this.prisma.walletAccount.createMany({
+      data:[{userId:actor.id}],skipDuplicates:true,
+    });
+    const wallet=await this.prisma.walletAccount.findUniqueOrThrow({where:{userId:actor.id}});
     return serialize(await this.prisma.walletAccount.findUniqueOrThrow({
       where:{id:wallet.id},include:{transactions:{orderBy:{createdAt:"desc"},take:30,include:{deal:{select:{ref:true,listing:{select:{name:true}}}}}}},
     }));
@@ -21,7 +24,12 @@ export class WalletService {
     const input=walletTopupSchema.parse(body);
     const amountMinor=BigInt(input.amountNaira)*100n;
     return serialize(await this.prisma.$transaction(async tx=>{
-      const wallet=await tx.walletAccount.upsert({where:{userId:actor.id},create:{userId:actor.id},update:{}});
+      // INSERT ... ON CONFLICT DO NOTHING is safe when separate requests
+      // try to create the same wallet concurrently. Prisma upsert can race.
+      await tx.walletAccount.createMany({
+        data:[{userId:actor.id}],skipDuplicates:true,
+      });
+      const wallet=await tx.walletAccount.findUniqueOrThrow({where:{userId:actor.id}});
       // Serialize updates to one demo wallet. Two requests with the same key share the first result.
       await tx.$queryRaw`SELECT "id" FROM "WalletAccount" WHERE "id" = ${wallet.id} FOR UPDATE`;
       const prior=await tx.walletTransaction.findUnique({where:{walletId_idempotencyKey:{walletId:wallet.id,idempotencyKey}}});

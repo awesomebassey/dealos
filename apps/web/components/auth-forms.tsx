@@ -34,8 +34,14 @@ function AccountTypeSelect({ value, onChange }: { value: string; onChange: (valu
   );
 }
 
+function safeNext(value: string | null) {
+  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+}
+
 export function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const nextPath = safeNext(params.get("next"));
   const [busy, setBusy] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -50,7 +56,7 @@ export function LoginForm() {
           password: String(data.get("password") ?? ""),
         }),
       }, { csrf: false });
-      router.replace("/dashboard");
+      router.replace(nextPath);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to sign in");
@@ -81,6 +87,7 @@ export function RegisterForm() {
   const router = useRouter();
   const params = useSearchParams();
   const requestedRole = params.get("account");
+  const nextPath = safeNext(params.get("next"));
   const [role, setRole] = useState(requestedRole === "SELLER" ? "SELLER" : "BUYER");
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -104,7 +111,7 @@ export function RegisterForm() {
           role,
         }),
       }, { csrf: false });
-      router.replace("/dashboard");
+      router.replace(nextPath);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to create account");

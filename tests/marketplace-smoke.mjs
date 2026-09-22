@@ -151,6 +151,15 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
     const queue=await advisor.get("/kyc/review-queue");
     assert.ok(queue.some(item=>item.user.id===buyerUser.id));
     assert.ok(queue.some(item=>item.user.id===sellerUser.id));
+    await advisor.blocked("POST","/kyc/"+buyerUser.id+"/review",400,{
+      category:"IDENTITY",approve:true,note:"Cannot approve without inspecting synthetic evidence",
+    });
+    const buyerCase=await buyer.get("/kyc/me");
+    for(const sample of [...buyerCase.evidence,...sellerCase.evidence]){
+      const preview=await advisor.request("GET","/kyc/evidence/"+sample.id+"/sample");
+      assert.equal(preview.status,200,"reviewer must be able to inspect "+sample.documentType);
+      assert.match(preview.data,/Synthetic, fabricated verification test only/);
+    }
     await advisor.post("/kyc/"+buyerUser.id+"/review",{category:"IDENTITY",approve:true,note:"Synthetic test accepted"});
     for(const category of ["IDENTITY","BUSINESS","REVENUE"]){
       await advisor.post("/kyc/"+sellerUser.id+"/review",{category,approve:true,note:"Synthetic test accepted"});

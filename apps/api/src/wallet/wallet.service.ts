@@ -22,6 +22,8 @@ export class WalletService {
     const amountMinor=BigInt(input.amountNaira)*100n;
     return serialize(await this.prisma.$transaction(async tx=>{
       const wallet=await tx.walletAccount.upsert({where:{userId:actor.id},create:{userId:actor.id},update:{}});
+      // Serialize updates to one demo wallet. Two requests with the same key share the first result.
+      await tx.$queryRaw`SELECT "id" FROM "WalletAccount" WHERE "id" = ${wallet.id} FOR UPDATE`;
       const prior=await tx.walletTransaction.findUnique({where:{walletId_idempotencyKey:{walletId:wallet.id,idempotencyKey}}});
       if(prior){
         if(prior.amountMinor!==amountMinor || prior.type!==WalletTxType.DEMO_TOPUP) throw new ConflictException("Idempotency key reused with a different amount");

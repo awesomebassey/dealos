@@ -322,7 +322,8 @@ export class EscrowService {
           },
         ],
       });
-      const sellerWallet=await tx.walletAccount.upsert({where:{userId:seller.userId},create:{userId:seller.userId},update:{}});
+      await tx.walletAccount.createMany({data:[{userId:seller.userId}],skipDuplicates:true});
+      const sellerWallet=await tx.walletAccount.findUniqueOrThrow({where:{userId:seller.userId}});
       await tx.walletAccount.update({where:{id:sellerWallet.id},data:{balanceMinor:{increment:escrow.amountMinor}}});
       await tx.walletTransaction.create({data:{
         walletId:sellerWallet.id,dealId,direction:WalletDirection.CREDIT,type:WalletTxType.ESCROW_RELEASE,

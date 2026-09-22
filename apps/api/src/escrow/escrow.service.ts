@@ -82,8 +82,8 @@ export class EscrowService {
       if (escrow.status !== EscrowStatus.CREATED && escrow.status !== EscrowStatus.FUNDING_PENDING) {
         throw new ConflictException(`Escrow cannot be funded from ${escrow.status}`);
       }
-      if (BigInt(input.amountMinor) !== escrow.amountMinor || input.currency !== escrow.currency) {
-        throw new ConflictException("Funding amount and currency must match the agreed escrow amount");
+      if (BigInt(input.amountMinor) !== escrow.amountMinor) {
+        throw new ConflictException("Funding amount must match the agreed escrow amount");
       }
 
       await tx.idempotencyRecord.create({ data: { scope, key: idempotencyKey, requestHash } });
@@ -138,7 +138,7 @@ export class EscrowService {
         action: "ESCROW_FUNDED",
         previousState: escrow.status,
         nextState: EscrowStatus.FUNDED,
-        metadata: { amountMinor: escrow.amountMinor.toString(), currency: escrow.currency, provider: input.provider },
+        metadata: { amountMinor: escrow.amountMinor.toString(), provider: input.provider },
         correlationId,
       }, tx);
       await tx.outboxEvent.create({
@@ -292,7 +292,7 @@ export class EscrowService {
         action: "ESCROW_RELEASED",
         previousState: escrow.status,
         nextState: EscrowStatus.RELEASED,
-        metadata: { amountMinor: escrow.amountMinor.toString(), currency: escrow.currency },
+        metadata: { amountMinor: escrow.amountMinor.toString() },
         correlationId,
       }, tx);
       await tx.outboxEvent.create({

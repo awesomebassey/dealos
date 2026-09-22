@@ -91,8 +91,19 @@ export class ListingsService {
     if (!(listing.status === ListingStatus.DRAFT || listing.status === ListingStatus.ARCHIVED)) {
       throw new ConflictException("Only draft or archived listings can be published");
     }
+    const requiredDocs=await this.prisma.dataRoomDocument.findMany({
+      where:{listingId:listing.id,active:true},select:{category:true},
+    });
+    if(!requiredDocs.some(d=>d.category==="Financial")){
+      throw new ForbiddenException("Add a synthetic financial sample before publishing");
+    }
     const updated=await this.prisma.$transaction(async tx=>{
-      const changed=await tx.listing.update({where:{id:listing.id},data:{status:ListingStatus.PUBLISHED}});
+      const claimed=await tx.listing.updateMany({
+        where:{id:listing.id,status:{in:[ListingStatus.DRAFT,ListingStatus.ARCHIVED]}},
+        data:{status:ListingStatus.PUBLISHED},
+      });
+      if(claimed.count!==1) throw new ConflictException("Business listing has already changed");
+      const changed=await tx.listing.findUniqueOrThrow({where:{id:listing.id}});
       await tx.auditEvent.create({data:{actorId:actor.id,resourceType:"LISTING",resourceId:listing.id,action:"LISTING_PUBLISHED",metadata:{},correlationId:randomUUID()}});
       await tx.outboxEvent.create({data:{topic:"listing.published",aggregateId:listing.id,payload:{listingId:listing.id}}});
       return changed;

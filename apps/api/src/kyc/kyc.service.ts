@@ -32,7 +32,7 @@ export class KycService {
   }
 
   async get(userId:string,actor:User) {
-    if(![UserRole.ADVISOR,UserRole.ADMIN].includes(actor.role)) throw new ForbiddenException("Reviewer account required");
+    if(!(actor.role === UserRole.ADVISOR || actor.role === UserRole.ADMIN)) throw new ForbiddenException("Reviewer account required");
     const item=await this.prisma.kycCase.findUnique({where:{userId},include:{
       user:{select:{id:true,name:true,email:true,role:true}},
       evidence:{select:{id:true,category:true,documentType:true,fileName:true,fileSize:true,status:true,reviewNote:true,createdAt:true},orderBy:{createdAt:"desc"}},
@@ -42,7 +42,7 @@ export class KycService {
   }
 
   async queue(actor:User) {
-    if(![UserRole.ADVISOR,UserRole.ADMIN].includes(actor.role)) throw new ForbiddenException("Reviewer account required");
+    if(!(actor.role === UserRole.ADVISOR || actor.role === UserRole.ADMIN)) throw new ForbiddenException("Reviewer account required");
     return serialize(await this.prisma.kycCase.findMany({
       where:{evidence:{some:{status:EvidenceStatus.SUBMITTED}}},
       include:{user:{select:{id:true,name:true,email:true,role:true}},evidence:{select:{category:true,status:true,documentType:true}}},
@@ -82,7 +82,7 @@ export class KycService {
   }
 
   async review(userId:string,actor:User,payload:unknown) {
-    if(![UserRole.ADVISOR,UserRole.ADMIN].includes(actor.role)) throw new ForbiddenException("Reviewer account required");
+    if(!(actor.role === UserRole.ADVISOR || actor.role === UserRole.ADMIN)) throw new ForbiddenException("Reviewer account required");
     const input=verificationReviewSchema.parse(payload);
     return this.prisma.$transaction(async tx=>{
       const item=await tx.kycCase.findUnique({where:{userId},include:{user:true,evidence:true}});

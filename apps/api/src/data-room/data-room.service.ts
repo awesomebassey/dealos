@@ -8,7 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { serialize } from "../common/serialize";
 
-const storageDir=resolve(process.env.DEALOS_PRIVATE_DOCUMENT_DIR || ".private/data-room");
+const storageDir=resolve(process.env.DEALOS_PRIVATE_DOCUMENT_DIR || "../../.private/data-room");
 function valid(bytes:Buffer,mime:string) {
   if(mime==="application/pdf") return bytes.subarray(0,5).toString("ascii")==="%PDF-";
   if(mime==="image/jpeg") return bytes[0]===255 && bytes[1]===216 && bytes[2]===255;
@@ -97,7 +97,7 @@ export class DataRoomService {
   });
   const origin=process.env.API_PUBLIC_BASE_URL || "http://localhost:4000";
   return {document:{id:document.id,name:document.name},
-   signedUrl:`${origin.replace(/\\/$/,"")}/api/data-room/documents/${document.id}/download?dealId=${encodeURIComponent(dealId)}`,
+   signedUrl:`${origin.replace(/\/$/,"")}/api/data-room/documents/${document.id}/download?dealId=${encodeURIComponent(dealId)}`,
    expiresInSeconds:0};
  }
 

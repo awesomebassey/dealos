@@ -68,7 +68,12 @@ export class KycService {
       const result=await this.prisma.$transaction(async tx=>{
         const item=await tx.kycCase.upsert({where:{userId:actor.id},
           create:{userId:actor.id,country:"Nigeria",status:KycStatus.IN_REVIEW},
-          update:{status:KycStatus.IN_REVIEW},
+          update:{
+            status:KycStatus.IN_REVIEW,
+            ...(input.category==="IDENTITY"?{identityVerified:false}:{}),
+            ...(input.category==="BUSINESS"?{businessVerified:false}:{}),
+            ...(input.category==="REVENUE"?{revenueVerified:false}:{}),
+          },
         });
         const evidence=await tx.verificationEvidence.create({data:{
           caseId:item.id,category:input.category,documentType:input.documentType,
@@ -102,9 +107,9 @@ export class KycService {
         reviewedAt:new Date(),reviewedById:actor.id,reviewNote:input.note||null,
       }});
       const flags={
-        identityVerified:item.identityVerified || (input.category==="IDENTITY" && input.approve),
-        businessVerified:item.businessVerified || (input.category==="BUSINESS" && input.approve),
-        revenueVerified:item.revenueVerified || (input.category==="REVENUE" && input.approve),
+        identityVerified:input.category==="IDENTITY"?input.approve:item.identityVerified,
+        businessVerified:input.category==="BUSINESS"?input.approve:item.businessVerified,
+        revenueVerified:input.category==="REVENUE"?input.approve:item.revenueVerified,
       };
       const done=item.user.role===UserRole.SELLER ? Object.values(flags).every(Boolean) : flags.identityVerified;
       const updated=await tx.kycCase.update({where:{id:item.id},data:{

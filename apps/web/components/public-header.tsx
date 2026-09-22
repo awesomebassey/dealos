@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { optionalCurrentUser } from "../lib/api";
 
-export function PublicHeader() {
+export async function PublicHeader() {
+  const user = await optionalCurrentUser();
+
   return (
     <header className="public-header">
       <Link href="/" className="wordmark">
@@ -9,12 +12,21 @@ export function PublicHeader() {
       </Link>
       <nav className="public-nav" aria-label="Main navigation">
         <Link href="/marketplace">Buy a business</Link>
-        <Link href="/register?account=SELLER">Sell a business</Link>
+        <Link href={user?.role === "SELLER" ? "/dashboard" : "/register?account=SELLER"}>Sell a business</Link>
         <Link href="/#how-it-works">How it works</Link>
       </nav>
       <div className="public-actions">
-        <Link href="/login" className="text-link">Sign in</Link>
-        <Link href="/register" className="button">Create account</Link>
+        {user ? (
+          <>
+            <span className="muted">Signed in as {user.name}</span>
+            <Link href="/dashboard" className="button">Open workspace</Link>
+          </>
+        ) : (
+          <>
+            <Link href="/login" className="text-link">Sign in</Link>
+            <Link href="/register" className="button">Create account</Link>
+          </>
+        )}
       </div>
     </header>
   );

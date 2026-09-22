@@ -163,7 +163,7 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
     listing=await seller.post("/listings",{
       name:"Synthetic River Analytics "+unique,category:"Analytics",
       askingPriceNaira:2_000_000,annualRevenueNaira:1_000_000,
-      recurringRevenuePct:80,customerConcentration:20,revenueTrendPct:12,
+      recurringRevenuePct:80,customerConcentration:35,revenueTrendPct:12,
       ownerHoursPerWeek:20,ipAssigned:true,litigationOpen:false,
     });
     assert.equal(listing.status,"DRAFT");
@@ -232,6 +232,16 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
         const findings=await advisor.get("/diligence/deals/"+mainDeal.id);
         assert.ok(Array.isArray(findings.findings));
         assert.ok(Array.isArray(findings.questions));
+        assert.ok(findings.questions.length>0);
+        const question=findings.questions[0];
+        await seller.post("/diligence/deals/"+mainDeal.id+"/questions/"+question.id+"/answer",{
+          answer:"Synthetic seller response supported by fabricated financial sample records",
+        });
+        const buyerView=await buyer.get("/diligence/deals/"+mainDeal.id);
+        assert.equal(
+          buyerView.questions.find(item=>item.id===question.id)?.answer,
+          "Synthetic seller response supported by fabricated financial sample records",
+        );
       }
     }
     const reviewed=await advisor.get("/deals/"+mainDeal.id);

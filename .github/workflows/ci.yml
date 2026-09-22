@@ -32,6 +32,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install --no-audit --no-fund
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-lockfile
+          path: package-lock.json
+          retention-days: 1
       - run: npm run db:generate
       - run: npm run db:push
       - run: npm run db:seed

@@ -24,9 +24,9 @@ export class DataRoomService {
   const deal=await this.prisma.deal.findUnique({where:{id:dealId},include:{participants:true,ndaAgreements:true}});
   if(!deal) throw new NotFoundException("Deal not found");
   const participant=deal.participants.some(p=>p.userId===actor.id);
-  if(![UserRole.ADMIN,UserRole.ADVISOR].includes(actor.role) && !participant) throw new ForbiddenException("Not a participant in this acquisition");
+  if(!(actor.role === UserRole.ADMIN || actor.role === UserRole.ADVISOR) && !participant) throw new ForbiddenException("Not a participant in this acquisition");
   const signed=deal.ndaAgreements.some(n=>n.userId===actor.id && n.status===NdaStatus.SIGNED);
-  const privileged=[UserRole.ADMIN,UserRole.ADVISOR,UserRole.SELLER].includes(actor.role);
+  const privileged=(actor.role === UserRole.ADMIN || actor.role === UserRole.ADVISOR || actor.role === UserRole.SELLER);
   return {deal,allowed:privileged||signed};
  }
 

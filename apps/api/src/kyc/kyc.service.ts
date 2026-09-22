@@ -12,7 +12,7 @@ const kinds:Record<EvidenceCategory,string[]>={
   BUSINESS:["CAC_CERTIFICATE","OWNERSHIP_PROOF","ADDRESS_EVIDENCE"],
   REVENUE:["BANK_STATEMENT","PROFIT_LOSS"],
 };
-const storageDir=resolve(process.env.DEALOS_PRIVATE_UPLOAD_DIR || ".private/verification");
+const storageDir=resolve(process.env.DEALOS_PRIVATE_UPLOAD_DIR || resolve(process.cwd(),"../../.private/verification"));
 function looksLike(bytes:Buffer,mime:string) {
   return (mime==="application/pdf" && bytes.subarray(0,5).toString("ascii")==="%PDF-") ||
     (mime==="image/jpeg" && bytes[0]===0xff && bytes[1]===0xd8 && bytes[2]===0xff) ||

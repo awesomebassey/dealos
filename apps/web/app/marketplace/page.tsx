@@ -36,7 +36,7 @@ export default async function Marketplace() {
                 <div className="list-row"><span className="muted">Annual revenue</span><strong>{money(listing.annualRevenueMinor)}</strong></div>
                 <div className="list-row"><span className="muted">Recurring revenue</span><strong>{listing.recurringRevenuePct}%</strong></div>
               </div>
-              <Link href="/register?role=BUYER" className="button full" style={{ marginTop: 22 }}>
+              <Link href="/register?account=BUYER" className="button full" style={{ marginTop: 22 }}>
                 View acquisition path <ArrowRight size={15}/>
               </Link>
             </article>
@@ -45,7 +45,7 @@ export default async function Marketplace() {
             <div className="feature-icon"><TrendingUp size={20}/></div>
             <h3>Selling a digital business?</h3>
             <p style={{ color: "#c5d4cd" }}>Create a seller account to prepare your verification, confidential documents and transaction workspace.</p>
-            <Link href="/register?role=SELLER" className="button lime" style={{ marginTop: 22 }}>Start your sale</Link>
+            <Link href="/register?account=SELLER" className="button lime" style={{ marginTop: 22 }}>Start your sale</Link>
           </article>
         </div>
       </main>

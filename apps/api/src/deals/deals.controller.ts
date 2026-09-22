@@ -63,7 +63,7 @@ export class DealsController {
       concatMap((events) => from(events)),
       map((event) => {
         cursor = event.createdAt;
-        return { id: event.id, type: event.action, data: serialize(event) } as MessageEvent;
+        return { id: event.id, type: "message", data: serialize(event) } as MessageEvent;
       }),
     );
   }

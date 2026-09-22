@@ -1,11 +1,11 @@
 import { Controller, Get, Param, UseGuards } from "@nestjs/common";
 import type { User } from "@prisma/client";
-import { DemoAuthGuard } from "../auth/demo-auth.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { Actor } from "../auth/actor.decorator";
 import { KycService } from "./kyc.service";
 
 @Controller("kyc")
-@UseGuards(DemoAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class KycController {
   constructor(private readonly kyc: KycService) {}
 

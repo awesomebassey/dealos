@@ -9,7 +9,7 @@ export default async function Dashboard() {
   const findings = deals.flatMap((deal) => deal.findings ?? []);
   const high = findings.filter((finding) => ["HIGH", "CRITICAL"].includes(finding.severity)).length;
   const funded = deals.filter((deal) => ["FUNDED", "VERIFICATION", "RELEASE_PENDING"].includes(deal.escrow?.status ?? "")).length;
-  const portfolioValue=deals.reduce((sum,deal)=>sum+BigInt(deal.agreedPriceMinor??0),0n);
+  const portfolioValue=deals.reduce((sum,deal)=>sum+BigInt(deal.agreedPriceMinor??0),BigInt(0));
 
   const roleCopy = user.role === "SELLER"
     ? {

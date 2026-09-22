@@ -54,6 +54,11 @@ async function main() {
   if(process.env.NODE_ENV==="production" || process.env.DEALOS_ALLOW_DESTRUCTIVE_SEED!=="true"){
     throw new Error("Seed deletes all demo data. Set DEALOS_ALLOW_DESTRUCTIVE_SEED=true in a disposable local/CI database only.");
   }
+  const dbHost=new URL(connectionString).hostname.toLowerCase();
+  if(!["localhost","127.0.0.1","::1"].includes(dbHost) &&
+    process.env.DEALOS_ALLOW_REMOTE_SEED!=="I_UNDERSTAND_THIS_DELETES_ALL_DATA") {
+    throw new Error("Refusing to erase a remote database. Use a disposable local PostgreSQL instance for demo seeding.");
+  }
   await prisma.walletTransaction.deleteMany();
   await prisma.walletAccount.deleteMany();
   await prisma.verificationEvidence.deleteMany();

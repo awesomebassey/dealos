@@ -149,6 +149,10 @@ export class KycService {
         action:input.approve?"DEMO_VERIFICATION_APPROVED":"DEMO_VERIFICATION_REJECTED",
         metadata:{category:input.category,userId,reviewNote:input.note||null},correlationId:randomUUID(),
       }});
+      await tx.outboxEvent.create({data:{
+        topic:"kyc.reviewed",aggregateId:item.id,
+        payload:{userId,category:input.category,approved:input.approve},
+      }});
       return serialize(updated);
     });
   }

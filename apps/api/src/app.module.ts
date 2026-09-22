@@ -8,6 +8,7 @@ import { DataRoomModule } from "./data-room/data-room.module";
 import { DiligenceModule } from "./diligence/diligence.module";
 import { EscrowModule } from "./escrow/escrow.module";
 import { KycModule } from "./kyc/kyc.module";
+import { ListingsModule } from "./listings/listings.module";
 import { OutboxWorker } from "./common/outbox.worker";
 
 @Module({
@@ -22,6 +23,7 @@ import { OutboxWorker } from "./common/outbox.worker";
     DiligenceModule,
     EscrowModule,
     KycModule,
+    ListingsModule,
   ],
 })
 export class AppModule {}

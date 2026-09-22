@@ -45,6 +45,11 @@ export class DealsController {
     return this.deals.transition(id, actor, body);
   }
 
+  @Post(":id/assets/:itemId/confirm")
+  confirmAsset(@Param("id") id:string,@Param("itemId") itemId:string,@Actor() actor:User){
+    return this.deals.confirmAsset(id,itemId,actor);
+  }
+
   @Sse(":id/events")
   events(
     @Param("id") id: string,

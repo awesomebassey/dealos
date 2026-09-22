@@ -1,51 +1,126 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { actors, type DemoRole } from "../lib/actors";
+import { toast } from "sonner";
+import { clientApi } from "../lib/client-api";
+import { money } from "../lib/money-client";
+
+type Action = {
+  label: string;
+  title: string;
+  description: string;
+  path: string;
+  body?: unknown;
+  idempotent?: boolean;
+};
 
 export function EscrowActions({
   dealId,
   dealStage,
-  role,
+  userRole,
   status,
   amountMinor,
-  currency,
   buyerSigned,
   sellerSigned,
   platformConfirmed,
 }: {
-  dealId: string; dealStage: string; role: DemoRole; status: string; amountMinor: string; currency: string;
-  buyerSigned: boolean; sellerSigned: boolean; platformConfirmed: boolean;
+  dealId: string;
+  dealStage: string;
+  userRole: string;
+  status: string;
+  amountMinor: string;
+  buyerSigned: boolean;
+  sellerSigned: boolean;
+  platformConfirmed: boolean;
 }) {
-  const router = useRouter(); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-  async function post(path: string, body?: unknown, idempotent = false) {
-    setBusy(true); setError(null);
-    const headers: Record<string,string> = { "content-type": "application/json", "x-demo-actor": actors[role].id };
-    if (idempotent) headers["idempotency-key"] = crypto.randomUUID();
-    const response = await fetch(`${apiUrl}/api${path}`, { method: "POST", headers, body: body ? JSON.stringify(body) : undefined });
-    if (!response.ok) setError(await response.text()); else router.refresh();
-    setBusy(false);
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [action, setAction] = useState<Action | null>(null);
+
+  let available: Action | null = null;
+  if (userRole === "BUYER" && dealStage === "ESCROW" && status === "CREATED") {
+    available = {
+      label: "Fund escrow",
+      title: "Fund this escrow?",
+      description: `You are about to fund ${money(amountMinor)} for this acquisition. The funding action is recorded against the deal.`,
+      path: `/escrow/deals/${dealId}/fund`,
+      body: { amountMinor, provider: "PAYSTACK" },
+      idempotent: true,
+    };
+  } else if (userRole === "BUYER" && status === "FUNDED" && !buyerSigned) {
+    available = {
+      label: "Confirm buyer completion",
+      title: "Confirm your side is complete?",
+      description: "Confirm only after you have verified the agreed assets and access. This confirmation contributes to escrow release.",
+      path: `/escrow/deals/${dealId}/sign-off`,
+      body: { party: "BUYER" },
+    };
+  } else if (userRole === "SELLER" && ["FUNDED", "VERIFICATION"].includes(status) && !sellerSigned) {
+    available = {
+      label: "Confirm seller completion",
+      title: "Confirm asset transfer is complete?",
+      description: "This records the seller completion confirmation and moves the transaction closer to release.",
+      path: `/escrow/deals/${dealId}/sign-off`,
+      body: { party: "SELLER" },
+    };
+  } else if (["ADVISOR", "ADMIN"].includes(userRole) && buyerSigned && sellerSigned && !platformConfirmed) {
+    available = {
+      label: "Confirm release conditions",
+      title: "Confirm release conditions?",
+      description: "Both parties have signed off. Confirm that the platform checks are complete before funds become releasable.",
+      path: `/escrow/deals/${dealId}/platform-confirm`,
+    };
+  } else if (["ADVISOR", "ADMIN"].includes(userRole) && status === "RELEASE_PENDING" && platformConfirmed) {
+    available = {
+      label: "Release funds",
+      title: "Release escrow funds?",
+      description: `This will record the release of ${money(amountMinor)} to the seller and complete the transaction.`,
+      path: `/escrow/deals/${dealId}/release`,
+      idempotent: true,
+    };
   }
-  return <div>
-    <div className="actions">
-      {role === "buyer" && dealStage === "ESCROW" && status === "CREATED" && (
-        <button className="button gold" disabled={busy} onClick={() => post(`/escrow/deals/${dealId}/fund`, { amountMinor, currency, provider: "STRIPE" }, true)}>Fund escrow</button>
-      )}
-      {role === "buyer" && status === "FUNDED" && !buyerSigned && (
-        <button className="button" disabled={busy} onClick={() => post(`/escrow/deals/${dealId}/sign-off`, { party: "BUYER" })}>Buyer sign-off</button>
-      )}
-      {role === "seller" && ["FUNDED","VERIFICATION"].includes(status) && !sellerSigned && (
-        <button className="button" disabled={busy} onClick={() => post(`/escrow/deals/${dealId}/sign-off`, { party: "SELLER" })}>Seller sign-off</button>
-      )}
-      {role === "advisor" && buyerSigned && sellerSigned && !platformConfirmed && (
-        <button className="button" disabled={busy} onClick={() => post(`/escrow/deals/${dealId}/platform-confirm`)}>Confirm release</button>
-      )}
-      {role === "advisor" && status === "RELEASE_PENDING" && platformConfirmed && (
-        <button className="button gold" disabled={busy} onClick={() => post(`/escrow/deals/${dealId}/release`, undefined, true)}>Release funds</button>
-      )}
-    </div>
-    {error && <div className="alert" style={{ marginTop: 12 }}>{error}</div>}
-  </div>;
+
+  async function run() {
+    if (!action) return;
+    setBusy(true);
+    try {
+      const headers: Record<string,string> = {};
+      if (action.idempotent) headers["idempotency-key"] = crypto.randomUUID();
+      await clientApi(action.path, {
+        method: "POST",
+        headers,
+        body: action.body ? JSON.stringify(action.body) : undefined,
+      });
+      toast.success("Escrow updated");
+      setAction(null);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update escrow");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!available) return null;
+
+  return (
+    <Dialog.Root open={!!action} onOpenChange={(open) => !open && setAction(null)}>
+      <Dialog.Trigger asChild>
+        <button className="button" onClick={() => setAction(available)}>{available.label}</button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="dialog-overlay"/>
+        <Dialog.Content className="dialog-content">
+          <Dialog.Title asChild><h2>{action?.title}</h2></Dialog.Title>
+          <Dialog.Description>{action?.description}</Dialog.Description>
+          <div className="dialog-actions">
+            <Dialog.Close asChild><button className="button secondary">Cancel</button></Dialog.Close>
+            <button className="button" disabled={busy} onClick={run}>{busy ? "Processing" : "Confirm"}</button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
 }

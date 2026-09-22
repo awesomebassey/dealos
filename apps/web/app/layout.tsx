@@ -1,26 +1,22 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "../components/sidebar";
-import { Topbar } from "../components/topbar";
+import { AppChrome } from "../components/app-chrome";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "DealOS",
-  description: "Acquisition transaction operations workspace",
+  title: {
+    default: "DealOS",
+    template: "%s | DealOS",
+  },
+  description: "A secure marketplace for buying and selling Nigerian digital businesses.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body>
-        <div className="shell">
-          <Sidebar />
-          <main className="main">
-            <Topbar />
-            <div className="content">{children}</div>
-          </main>
-        </div>
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );

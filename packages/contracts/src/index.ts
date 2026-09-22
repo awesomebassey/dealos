@@ -20,7 +20,7 @@ export const transitionDealSchema = z.object({
 
 export const fundEscrowSchema = z.object({
   amountMinor: z.string().regex(/^\d+$/),
-  provider: z.enum(["PAYSTACK", "WIRE"]),
+  provider: z.literal("SANDBOX"),
 });
 
 export const registerSchema = z.object({

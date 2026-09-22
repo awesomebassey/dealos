@@ -48,6 +48,13 @@ export class OffersService {
         if(locked.count!==1) throw new ConflictException("Another offer was accepted or the listing is unavailable");
         await tx.deal.update({where:{id:deal.id},data:{agreedPriceMinor:deal.offer.amountMinor,stage:DealStage.LOI,version:{increment:1}}});
         await tx.escrowAccount.create({data:{dealId,amountMinor:deal.offer.amountMinor,currency:"NGN",status:"CREATED"}});
+        await tx.assetTransferItem.createMany({data:[
+          "Primary business domain and DNS",
+          "Source code and deployment access",
+          "Product and cloud infrastructure",
+          "Customer contracts and operating records",
+          "Intellectual property and brand assets",
+        ].map(label=>({dealId,label}))});
         await tx.deal.updateMany({where:{listingId:deal.listingId,id:{not:dealId},stage:{notIn:[DealStage.COMPLETED,DealStage.WITHDRAWN]}},data:{stage:DealStage.WITHDRAWN,version:{increment:1}}});
         await tx.acquisitionOffer.updateMany({where:{deal:{listingId:deal.listingId},id:{not:deal.offer.id},status:OfferStatus.SUBMITTED},data:{status:OfferStatus.DECLINED,reviewedAt:new Date()}});
       } else {

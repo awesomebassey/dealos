@@ -210,7 +210,7 @@ test("100 business marketplace and complete isolated sandbox acquisition", {time
     assert.deepEqual(mainDocs.map(doc=>doc.id),[financialDocId]);
     const access=await buyer.post("/data-room/documents/"+financialDocId+"/access?dealId="+mainDeal.id);
     assert.ok(access.signedUrl.includes("/api/data-room/documents/"));
-    const sameOriginPath=access.signedUrl.replace(/^\\/api/,"");
+    const sameOriginPath=access.signedUrl.startsWith("/api/")?access.signedUrl.slice(4):access.signedUrl;
     const downloaded=await buyer.request("GET",sameOriginPath);
     assert.equal(downloaded.status,200);
     assert.match(downloaded.data,/SYNTHETIC TEST ONLY/);

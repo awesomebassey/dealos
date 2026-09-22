@@ -124,6 +124,17 @@ export class KycService {
       if(!documents.length) throw new BadRequestException("No submitted evidence to review");
       const all=[...item.evidence.filter(e=>e.category===input.category && e.status===EvidenceStatus.APPROVED),...documents];
       if(input.approve) {
+        const inspected=await tx.auditEvent.findMany({
+          where:{
+            actorId:actor.id,resourceType:"KYC_EVIDENCE",action:"DEMO_EVIDENCE_VIEWED",
+            resourceId:{in:documents.map(e=>e.id)},
+          },
+          distinct:["resourceId"],
+          select:{resourceId:true},
+        });
+        if(inspected.length!==documents.length) {
+          throw new BadRequestException("Open each submitted sample before approving the demonstration review");
+        }
         const types=new Set(all.map(e=>e.documentType));
         const ok=input.category==="IDENTITY" ? all.length>=1 :
           input.category==="BUSINESS" ? ["CAC_CERTIFICATE","OWNERSHIP_PROOF","ADDRESS_EVIDENCE"].every(t=>types.has(t)) :

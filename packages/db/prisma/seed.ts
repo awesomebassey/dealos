@@ -199,7 +199,7 @@ async function main() {
     },
   });
 
-  const sampleRoot=resolve(process.env.DEALOS_PRIVATE_DOCUMENT_DIR || ".private/data-room");
+  const sampleRoot=resolve(process.env.DEALOS_PRIVATE_DOCUMENT_DIR || "../../.private/data-room");
   async function sampleDocument(listingId:string,category:string,name:string) {
     const storageKey=`${listingId}/${randomUUID()}`;
     const content=Buffer.from(`SIMULATED SAMPLE DATA ONLY\\nBusiness: ${listingId}\\nDocument: ${name}\\nNo real personal or financial information.\\n`);

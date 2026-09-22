@@ -190,7 +190,7 @@ export class DealsService {
   }
 
   async confirmAsset(dealId:string,itemId:string,actor:User) {
-    if(![UserRole.BUYER,UserRole.SELLER].includes(actor.role)) throw new ForbiddenException("Buyer or seller account required");
+    if(!(actor.role === UserRole.BUYER || actor.role === UserRole.SELLER)) throw new ForbiddenException("Buyer or seller account required");
     await this.assertParticipant(dealId,actor);
     const deal=await this.prisma.deal.findUnique({where:{id:dealId}});
     if(!deal || deal.stage!==DealStage.ASSET_TRANSFER) throw new ConflictException("The deal must be in asset transfer");

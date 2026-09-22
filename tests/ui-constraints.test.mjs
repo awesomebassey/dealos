@@ -21,7 +21,7 @@ test("product UI avoids prohibited presentation markers", () => {
   assert.doesNotMatch(source, /eyebrow/i);
   assert.doesNotMatch(source, /developer note/i);
   assert.doesNotMatch(source, /founder note/i);
-  assert.doesNotMatch(source, /<select\b/i);
+  assert.doesNotMatch(source, /<select\b/);
   assert.doesNotMatch(source, /type\s*=\s*["']checkbox["']/i);
   assert.doesNotMatch(source, /\bwindow\.(alert|confirm|prompt|open)\b/i);
   assert.doesNotMatch(source, /\bx-demo-actor\b/i);

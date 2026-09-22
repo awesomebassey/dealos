@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADVISOR
+  ADMIN
+}
+
+enum DealStage {
+  NDA_PENDING
+  DILIGENCE
+  LOI
+  FULL_DILIGENCE
+  SPA
+  ESCROW
+  ASSET_TRANSFER
+  COMPLETED
+  WITHDRAWN
+}
+
+enum NdaStatus {
+  PENDING
+  SIGNED
+  REVOKED
+}
+
+enum EscrowStatus {
+  CREATED
+  FUNDING_PENDING
+  FUNDED
+  TRANSFER_IN_PROGRESS
+  VERIFICATION
+  RELEASE_PENDING
+  RELEASED
+  DISPUTED
+}
+
+enum EscrowTxType {
+  FUND
+  RELEASE
+  REFUND
+  FEE
+}
+
+enum EscrowTxStatus {
+  PENDING
+  ACCEPTED
+  SETTLED
+  FAILED
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+enum KycStatus {
+  PENDING
+  IN_REVIEW
+  NEEDS_INFORMATION
+  VERIFIED
+  REJECTED
+}
+
+enum FindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+}
+
+model User {
+  id             String            @id @default(uuid())
+  name           String
+  email          String            @unique
+  role           UserRole
+  organizationId String?
+  organization   Organization?     @relation(fields: [organizationId], references: [id])
+  dealActors     DealParticipant[]
+  auditEvents    AuditEvent[]       @relation("AuditActor")
+  ndaAgreements  NdaAgreement[]
+  dataAccesses   DataRoomAccess[]
+  kycCase        KycCase?
+  createdAt      DateTime          @default(now())
+}
+
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  country   String
+  users     User[]
+  listings  Listing[]
+  createdAt DateTime  @default(now())
+}
+
+model Listing {
+  id                    String             @id @default(uuid())
+  organizationId        String
+  organization          Organization       @relation(fields: [organizationId], references: [id])
+  name                  String
+  slug                  String             @unique
+  category              String
+  country               String
+  askingPriceMinor      BigInt
+  currency              String             @default("USD")
+  annualRevenueMinor    BigInt
+  recurringRevenuePct   Int                @default(0)
+  customerConcentration Int                @default(0)
+  revenueTrendPct        Int                @default(0)
+  ownerHoursPerWeek     Int                @default(0)
+  ipAssigned            Boolean            @default(false)
+  litigationOpen        Boolean            @default(false)
+  deals                 Deal[]
+  documents             DataRoomDocument[]
+  createdAt             DateTime           @default(now())
+}
+
+model Deal {
+  id                  String                @id @default(uuid())
+  ref                 String                @unique
+  listingId           String
+  listing             Listing               @relation(fields: [listingId], references: [id])
+  stage               DealStage             @default(NDA_PENDING)
+  version             Int                   @default(0)
+  agreedPriceMinor    BigInt?
+  currency            String                @default("USD")
+  fxRateBasisPoints   Int?                  
+  participants        DealParticipant[]
+  ndaAgreements       NdaAgreement[]
+  escrow              EscrowAccount?
+  findings            DueDiligenceFinding[]
+  questions           DueDiligenceQuestion[]
+  auditEvents         AuditEvent[]
+  assetItems          AssetTransferItem[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+model DealParticipant {
+  id        String   @id @default(uuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      UserRole
+  createdAt DateTime @default(now())
+
+  @@unique([dealId, userId])
+}
+
+model NdaAgreement {
+  id        String    @id @default(uuid())
+  dealId    String
+  deal      Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  version   String
+  status    NdaStatus @default(PENDING)
+  signedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([dealId, userId])
+}
+
+model DataRoomDocument {
+  id          String           @id @default(uuid())
+  listingId   String
+  listing     Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  name        String
+  category    String
+  objectKey   String
+  contentType String
+  sizeBytes   Int
+  active      Boolean          @default(true)
+  accesses    DataRoomAccess[]
+  createdAt   DateTime         @default(now())
+}
+
+model DataRoomAccess {
+  id         String           @id @default(uuid())
+  documentId String
+  document   DataRoomDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  dealId     String
+  allowed    Boolean
+  reason     String?
+  createdAt  DateTime         @default(now())
+
+  @@index([dealId, createdAt])
+}
+
+model EscrowAccount {
+  id                  String              @id @default(uuid())
+  dealId              String              @unique
+  deal                Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  status              EscrowStatus        @default(CREATED)
+  amountMinor         BigInt
+  currency            String
+  buyerSignedOffAt    DateTime?
+  sellerSignedOffAt   DateTime?
+  platformConfirmedAt DateTime?
+  disputedAt          DateTime?
+  transactions        EscrowTransaction[]
+  ledgerEntries       LedgerEntry[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+}
+
+model EscrowTransaction {
+  id               String         @id @default(uuid())
+  escrowAccountId  String
+  escrowAccount    EscrowAccount  @relation(fields: [escrowAccountId], references: [id], onDelete: Cascade)
+  type             EscrowTxType
+  status           EscrowTxStatus
+  amountMinor      BigInt
+  currency         String
+  provider         String
+  providerRef      String         @unique
+  idempotencyKey   String         @unique
+  createdAt        DateTime       @default(now())
+  settledAt        DateTime?
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  escrowAccountId String
+  escrowAccount   EscrowAccount   @relation(fields: [escrowAccountId], references: [id], onDelete: Cascade)
+  transactionId   String
+  account         String
+  direction       LedgerDirection
+  amountMinor     BigInt
+  currency        String
+  createdAt       DateTime        @default(now())
+
+  @@index([transactionId])
+}
+
+model DueDiligenceFinding {
+  id         String          @id @default(uuid())
+  dealId     String
+  deal       Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  code       String
+  title      String
+  severity   FindingSeverity
+  detail     String
+  evidence   Json
+  resolvedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@unique([dealId, code])
+}
+
+model DueDiligenceQuestion {
+  id        String   @id @default(uuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  findingId String?
+  question  String
+  answer    String?
+  createdAt DateTime @default(now())
+}
+
+model AssetTransferItem {
+  id          String   @id @default(uuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  label       String
+  sellerDone  Boolean  @default(false)
+  buyerDone   Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model KycCase {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           KycStatus @default(PENDING)
+  identityVerified Boolean   @default(false)
+  businessVerified Boolean   @default(false)
+  revenueVerified  Boolean   @default(false)
+  riskScore        Int       @default(0)
+  country          String
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid())
+  dealId        String?
+  deal          Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?    @relation("AuditActor", fields: [actorId], references: [id])
+  resourceType  String
+  resourceId    String
+  action        String
+  previousState String?
+  nextState     String?
+  metadata      Json
+  correlationId String
+  createdAt     DateTime @default(now())
+
+  @@index([dealId, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+}
+
+model IdempotencyRecord {
+  id          String   @id @default(uuid())
+  scope       String
+  key         String
+  requestHash String
+  resultId    String?
+  createdAt   DateTime @default(now())
+
+  @@unique([scope, key])
+}
+
+model OutboxEvent {
+  id          String       @id @default(uuid())
+  topic       String
+  aggregateId String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  attempts    Int          @default(0)
+  availableAt DateTime     @default(now())
+  deliveredAt DateTime?
+  lastError   String?
+  createdAt   DateTime     @default(now())
+
+  @@index([status, availableAt])
+}

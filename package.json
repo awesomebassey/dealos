@@ -1,0 +1,26 @@
+{
+  "name": "dealos",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @dealos/contracts && concurrently -n web,api -c auto \"npm run dev -w @dealos/web\" \"npm run start:dev -w @dealos/api\"",
+    "build": "npm run build -w @dealos/contracts && npm run generate -w @dealos/db && npm run build -w @dealos/api && npm run build -w @dealos/web",
+    "test": "npm run test -w @dealos/api",
+    "db:generate": "npm run generate -w @dealos/db",
+    "db:migrate": "npm run migrate -w @dealos/db",
+    "db:seed": "npm run seed -w @dealos/db",
+    "db:push": "npm run push -w @dealos/db",
+    "test:static": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

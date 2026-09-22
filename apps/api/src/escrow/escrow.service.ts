@@ -38,7 +38,7 @@ export class EscrowService {
     });
     if (!deal || !deal.escrow) throw new NotFoundException("Escrow account not found");
     const participant = deal.participants.some((p) => p.userId === actor.id);
-    if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role) && !participant) {
+    if (actor.role !== UserRole.ADMIN && !participant) {
       throw new ForbiddenException("You do not have access to this escrow");
     }
     return deal;

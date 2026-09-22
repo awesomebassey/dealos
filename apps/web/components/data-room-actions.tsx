@@ -36,7 +36,7 @@ export function DataRoomAction({ documentId, dealId }: { documentId: string; dea
         <Dialog.Content className="dialog-content">
           <Dialog.Title asChild><h2>Document access granted</h2></Dialog.Title>
           <Dialog.Description>
-            Your access has been recorded against this transaction. The protected link expires shortly.
+            Your access is recorded for this acquisition. Opening the file requires your active session and the signed NDA.
           </Dialog.Description>
           <div className="dialog-actions">
             <Dialog.Close asChild><button className="button secondary">Close</button></Dialog.Close>

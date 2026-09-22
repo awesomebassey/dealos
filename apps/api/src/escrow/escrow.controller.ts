@@ -1,11 +1,11 @@
 import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/common";
 import type { User } from "@prisma/client";
-import { DemoAuthGuard } from "../auth/demo-auth.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { Actor } from "../auth/actor.decorator";
 import { EscrowService } from "./escrow.service";
 
 @Controller("escrow")
-@UseGuards(DemoAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class EscrowController {
   constructor(private readonly escrow: EscrowService) {}
 

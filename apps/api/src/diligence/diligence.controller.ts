@@ -1,11 +1,11 @@
 import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import type { User } from "@prisma/client";
-import { DemoAuthGuard } from "../auth/demo-auth.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { Actor } from "../auth/actor.decorator";
 import { DiligenceService } from "./diligence.service";
 
 @Controller("diligence")
-@UseGuards(DemoAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class DiligenceController {
   constructor(private readonly diligence: DiligenceService) {}
 

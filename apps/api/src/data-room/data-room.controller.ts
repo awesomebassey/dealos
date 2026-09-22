@@ -1,11 +1,11 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import type { User } from "@prisma/client";
-import { DemoAuthGuard } from "../auth/demo-auth.guard";
+import { SessionAuthGuard } from "../auth/session-auth.guard";
 import { Actor } from "../auth/actor.decorator";
 import { DataRoomService } from "./data-room.service";
 
 @Controller("data-room")
-@UseGuards(DemoAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class DataRoomController {
   constructor(private readonly dataRoom: DataRoomService) {}
 

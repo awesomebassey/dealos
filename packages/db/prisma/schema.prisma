@@ -87,6 +87,7 @@ model User {
   id             String            @id @default(uuid())
   name           String
   email          String            @unique
+  passwordHash   String
   role           UserRole
   organizationId String?
   organization   Organization?     @relation(fields: [organizationId], references: [id])
@@ -95,7 +96,36 @@ model User {
   ndaAgreements  NdaAgreement[]
   dataAccesses   DataRoomAccess[]
   kycCase        KycCase?
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
   createdAt      DateTime          @default(now())
+}
+
+model Session {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique
+  csrfTokenHash String
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model Organization {
@@ -116,7 +146,7 @@ model Listing {
   category              String
   country               String
   askingPriceMinor      BigInt
-  currency              String             @default("USD")
+  currency              String             @default("NGN")
   annualRevenueMinor    BigInt
   recurringRevenuePct   Int                @default(0)
   customerConcentration Int                @default(0)
@@ -137,7 +167,7 @@ model Deal {
   stage               DealStage             @default(NDA_PENDING)
   version             Int                   @default(0)
   agreedPriceMinor    BigInt?
-  currency            String                @default("USD")
+  currency            String                @default("NGN")
   fxRateBasisPoints   Int?                  
   participants        DealParticipant[]
   ndaAgreements       NdaAgreement[]

@@ -1,17 +1,108 @@
 import { CircleCheck, Clock3, ShieldCheck } from "lucide-react";
-import { api, type Deal, money } from "../../lib/api";
-import { roleFrom } from "../../lib/actors";
+import { api, currentUser, type Deal, money, sentence } from "../../lib/api";
 import { EscrowActions } from "../../components/escrow-actions";
 
-type Escrow={status:string;amountMinor:string;currency:string;buyerSignedOffAt?:string|null;sellerSignedOffAt?:string|null;platformConfirmedAt?:string|null;transactions:Array<{id:string;type:string;status:string;amountMinor:string;currency:string;provider:string;providerRef:string;createdAt:string}>;ledgerEntries:Array<{id:string;account:string;direction:string;amountMinor:string;currency:string;createdAt:string}>};
+type Escrow = {
+  status:string;
+  amountMinor:string;
+  buyerSignedOffAt?:string|null;
+  sellerSignedOffAt?:string|null;
+  platformConfirmedAt?:string|null;
+  transactions:Array<{id:string;type:string;status:string;amountMinor:string;provider:string;providerRef:string;createdAt:string}>;
+  ledgerEntries:Array<{id:string;account:string;direction:string;amountMinor:string;createdAt:string}>;
+};
 
-export default async function Escrow({searchParams}:{searchParams:Promise<{role?:string}>}){
-  const {role:raw}=await searchParams; const role=roleFrom(raw); const deals=await api<Deal[]>("/deals",role); const deal=deals[0]; if(!deal) return <div className="empty">No active deal.</div>;
-  const escrow=await api<Escrow>(`/escrow/deals/${deal.id}`,role);
-  const checks=[{label:"Buyer completion",done:!!escrow.buyerSignedOffAt},{label:"Seller completion",done:!!escrow.sellerSignedOffAt},{label:"Platform confirmation",done:!!escrow.platformConfirmedAt}];
-  return <><div className="page-head"><div><h1>Escrow operations</h1><p>{deal.ref} · {deal.listing.name}</p></div><EscrowActions dealId={deal.id} dealStage={deal.stage} role={role} status={escrow.status} amountMinor={escrow.amountMinor} currency={escrow.currency} buyerSigned={!!escrow.buyerSignedOffAt} sellerSigned={!!escrow.sellerSignedOffAt} platformConfirmed={!!escrow.platformConfirmedAt}/></div>
-    <div className="grid three"><div className="card card-pad"><div className="stat-label">Escrow value</div><div className="stat-value">{money(escrow.amountMinor,escrow.currency)}</div><div className="stat-foot">Agreed transaction amount</div></div><div className="card card-pad"><div className="stat-label">Status</div><div className="stat-value" style={{fontSize:22}}>{escrow.status.replaceAll("_"," ").toLowerCase()}</div><div className="stat-foot">Current custody state</div></div><div className="card card-pad"><div className="stat-label">Currency</div><div className="stat-value">{escrow.currency}</div><div className="stat-foot">FX basis locked at LOI</div></div></div>
-    <div className="grid two" style={{marginTop:18}}><section className="card card-pad"><h2 className="section-title">Release controls</h2><div className="list" style={{marginTop:12}}>{checks.map(c=><div className="list-row" key={c.label}><div style={{display:"flex",gap:10,alignItems:"center"}}>{c.done?<CircleCheck size={18} color="var(--green)"/>:<Clock3 size={18} color="var(--amber)"/>}<span>{c.label}</span></div><span className={`badge ${c.done?"":"warn"}`}>{c.done?"complete":"pending"}</span></div>)}</div></section><section className="card card-pad"><h2 className="section-title">Custody protections</h2><div className="list" style={{marginTop:12}}>{["Dual-party completion sign-off","Platform release confirmation","Replay-safe release command","Immutable ledger movement"].map(label=><div className="list-row" key={label}><div style={{display:"flex",gap:10,alignItems:"center"}}><ShieldCheck size={17} color="var(--forest)"/><span>{label}</span></div></div>)}</div></section></div>
-    <section className="card" style={{marginTop:18}}><div className="section-head"><h2 className="section-title">Transactions</h2><span className="muted">{escrow.transactions.length} recorded</span></div>{escrow.transactions.length?<div className="table-wrap"><table><thead><tr><th>Type</th><th>Status</th><th>Amount</th><th>Provider</th><th>Reference</th></tr></thead><tbody>{escrow.transactions.map(tx=><tr key={tx.id}><td><strong>{tx.type.toLowerCase()}</strong></td><td><span className="badge">{tx.status.toLowerCase()}</span></td><td>{money(tx.amountMinor,tx.currency)}</td><td>{tx.provider}</td><td className="mono">{tx.providerRef}</td></tr>)}</tbody></table></div>:<div className="empty">No escrow transactions yet.</div>}</section>
-  </>;
+export default async function Escrow() {
+  const [user, deals] = await Promise.all([currentUser(), api<Deal[]>("/deals")]);
+  const deal = deals[0];
+
+  if (!deal) return <div className="empty"><h3>No escrow yet</h3><p>Escrow becomes available when an active transaction reaches the closing stage.</p></div>;
+
+  const escrow = await api<Escrow>(`/escrow/deals/${deal.id}`);
+  const checks = [
+    { label:"Buyer completion", done:!!escrow.buyerSignedOffAt },
+    { label:"Seller completion", done:!!escrow.sellerSignedOffAt },
+    { label:"Platform confirmation", done:!!escrow.platformConfirmedAt },
+  ];
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Escrow</h1>
+          <p>{deal.listing.name} / Track funding, completion confirmation and release.</p>
+        </div>
+        <EscrowActions
+          dealId={deal.id}
+          dealStage={deal.stage}
+          userRole={user.role}
+          status={escrow.status}
+          amountMinor={escrow.amountMinor}
+          buyerSigned={!!escrow.buyerSignedOffAt}
+          sellerSigned={!!escrow.sellerSignedOffAt}
+          platformConfirmed={!!escrow.platformConfirmedAt}
+        />
+      </div>
+
+      <div className="grid two">
+        <div className="card card-pad">
+          <div className="stat-label">Escrow amount</div>
+          <div className="stat-value">{money(escrow.amountMinor)}</div>
+          <div className="stat-foot">Agreed transaction value held for this deal</div>
+        </div>
+        <div className="card card-pad">
+          <div className="stat-label">Current status</div>
+          <div className="stat-value" style={{ fontSize:22 }}>{sentence(escrow.status)}</div>
+          <div className="stat-foot">Funds release only after the required confirmations</div>
+        </div>
+      </div>
+
+      <div className="grid two" style={{ marginTop:16 }}>
+        <section className="card card-pad">
+          <h2 className="section-title">Release checks</h2>
+          <div className="list" style={{ marginTop:10 }}>
+            {checks.map((check) => (
+              <div className="list-row" key={check.label}>
+                <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                  {check.done ? <CircleCheck size={18} color="var(--success)"/> : <Clock3 size={18} color="var(--warning)"/>}
+                  <span>{check.label}</span>
+                </div>
+                <span className={`status ${check.done ? "success" : "warning"}`}>{check.done ? "Complete" : "Pending"}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card card-pad">
+          <h2 className="section-title">Release protection</h2>
+          <div className="list" style={{ marginTop:10 }}>
+            {[
+              "Buyer and seller must both confirm completion",
+              "Platform confirmation is required before release",
+              "Repeated release requests cannot duplicate a payout",
+              "Every escrow movement is recorded in the ledger",
+            ].map((label) => (
+              <div className="list-row" key={label}>
+                <div style={{ display:"flex", gap:10, alignItems:"center" }}><ShieldCheck size={17} color="var(--green)"/><span>{label}</span></div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="card" style={{ marginTop:16 }}>
+        <div className="section-head"><h2 className="section-title">Escrow activity</h2><span className="muted">{escrow.transactions.length} transactions</span></div>
+        {escrow.transactions.length ? (
+          <div className="table-wrap"><table><thead><tr><th>Action</th><th>Status</th><th>Amount</th><th>Method</th><th>Reference</th></tr></thead><tbody>{escrow.transactions.map((transaction) => (
+            <tr key={transaction.id}>
+              <td><strong>{sentence(transaction.type)}</strong></td>
+              <td><span className="status success">{sentence(transaction.status)}</span></td>
+              <td>{money(transaction.amountMinor)}</td>
+              <td>{sentence(transaction.provider)}</td>
+              <td className="mono">{transaction.providerRef}</td>
+            </tr>
+          ))}</tbody></table></div>
+        ) : <div className="empty"><p>No escrow transaction has been recorded yet.</p></div>}
+      </section>
+    </>
+  );
 }

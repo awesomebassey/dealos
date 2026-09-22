@@ -10,6 +10,22 @@ import {
 } from "@prisma/client";
 import { config } from "dotenv";
 import { resolve } from "node:path";
+import { randomBytes, scrypt } from "node:crypto";
+
+function deriveSeedPassword(password: string, salt: Buffer) {
+  return new Promise<Buffer>((resolveKey, reject) => {
+    scrypt(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, key) => {
+      if (error) reject(error);
+      else resolveKey(key);
+    });
+  });
+}
+
+async function demoPasswordHash(password: string) {
+  const salt = randomBytes(16);
+  const key = await deriveSeedPassword(password, salt);
+  return ["scrypt", 32768, 8, 1, salt.toString("base64url"), key.toString("base64url")].join("$");
+}
 
 config({ path: resolve(process.cwd(), "../../.env"), quiet: true });
 
@@ -45,6 +61,8 @@ async function main() {
   await prisma.auditEvent.deleteMany();
   await prisma.dealParticipant.deleteMany();
   await prisma.deal.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.session.deleteMany();
   await prisma.kycCase.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
@@ -60,6 +78,8 @@ async function main() {
     },
   });
 
+  const passwordHash = await demoPasswordHash("DealOS2026!");
+
   await prisma.user.createMany({
     data: [
       {
@@ -67,12 +87,14 @@ async function main() {
         name: "Amara Okafor",
         email: "amara@northstar.capital",
         role: UserRole.BUYER,
+        passwordHash,
       },
       {
         id: ids.seller,
         name: "Tunde Adebayo",
         email: "tunde@korametrics.example",
         role: UserRole.SELLER,
+        passwordHash,
         organizationId: ids.sellerOrg,
       },
       {
@@ -80,6 +102,7 @@ async function main() {
         name: "Nia Mensah",
         email: "nia@dealos.example",
         role: UserRole.ADVISOR,
+        passwordHash,
       },
     ],
   });
@@ -117,9 +140,9 @@ async function main() {
       slug: "korametrics",
       category: "SaaS / Analytics",
       country: "Nigeria",
-      askingPriceMinor: 42500000n,
-      currency: "USD",
-      annualRevenueMinor: 26800000n,
+      askingPriceMinor: 65000000000n,
+      currency: "NGN",
+      annualRevenueMinor: 41000000000n,
       recurringRevenuePct: 81,
       customerConcentration: 38,
       revenueTrendPct: -6,
@@ -136,9 +159,8 @@ async function main() {
       listingId: ids.listing,
       stage: DealStage.FULL_DILIGENCE,
       version: 3,
-      agreedPriceMinor: 39000000n,
-      currency: "USD",
-      fxRateBasisPoints: 10000,
+      agreedPriceMinor: 59500000000n,
+      currency: "NGN",
       participants: {
         create: [
           { userId: ids.buyer, role: UserRole.BUYER },
@@ -215,8 +237,8 @@ async function main() {
     data: {
       dealId: ids.deal,
       status: EscrowStatus.CREATED,
-      amountMinor: 39000000n,
-      currency: "USD",
+      amountMinor: 59500000000n,
+      currency: "NGN",
     },
   });
 
@@ -269,7 +291,7 @@ async function main() {
   const events = [
     ["DEAL_CREATED", null, "NDA_PENDING", "Deal opened for KoraMetrics"],
     ["NDA_SIGNED", "NDA_PENDING", "DILIGENCE", "Buyer signed NDA v4.2"],
-    ["LOI_ACCEPTED", "DILIGENCE", "LOI", "Seller accepted USD 390,000 LOI"],
+    ["LOI_ACCEPTED", "DILIGENCE", "LOI", "Seller accepted the ₦595,000,000 LOI"],
     ["FULL_DILIGENCE_STARTED", "LOI", "FULL_DILIGENCE", "Full diligence workspace opened"],
   ] as const;
 

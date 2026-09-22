@@ -20,8 +20,33 @@ export const transitionDealSchema = z.object({
 
 export const fundEscrowSchema = z.object({
   amountMinor: z.string().regex(/^\d+$/),
-  currency: z.enum(["USD", "NGN", "GHS", "KES", "ZAR", "GBP", "EUR"]),
-  provider: z.enum(["PAYSTACK", "STRIPE", "WIRE"]),
+  provider: z.enum(["PAYSTACK", "WIRE"]),
+});
+
+export const registerSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(10).max(128),
+  role: z.enum(["BUYER", "SELLER"]),
+});
+
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(1).max(128),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20),
+  password: z.string().min(10).max(128),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(10).max(128),
 });
 
 export const signOffSchema = z.object({
@@ -31,3 +56,5 @@ export const signOffSchema = z.object({
 export type DealStage = z.infer<typeof dealStageSchema>;
 export type TransitionDealInput = z.infer<typeof transitionDealSchema>;
 export type FundEscrowInput = z.infer<typeof fundEscrowSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

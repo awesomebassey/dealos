@@ -41,6 +41,7 @@ export class DealsService {
         findings: { where: { resolvedAt: null } },
       },
       orderBy: { updatedAt: "desc" },
+      take: 100,
     });
     return serialize(deals);
   }
@@ -77,6 +78,17 @@ export class DealsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const deal = await tx.deal.findUnique({ where: { id } });
       if (!deal) throw new NotFoundException("Deal not found");
+      if (deal.stage !== DealStage.NDA_PENDING) {
+        const signed = await tx.ndaAgreement.findUnique({
+          where: { dealId_userId: { dealId: id, userId: actor.id } },
+        });
+        if (signed?.status === "SIGNED" && deal.stage !== DealStage.WITHDRAWN) return signed;
+        throw new ConflictException("This acquisition is no longer awaiting an NDA");
+      }
+      const previouslySigned = await tx.ndaAgreement.findUnique({
+        where: { dealId_userId: { dealId: id, userId: actor.id } },
+      });
+      if (previouslySigned?.status === "SIGNED") return previouslySigned;
 
       const nda = await tx.ndaAgreement.upsert({
         where: { dealId_userId: { dealId: id, userId: actor.id } },

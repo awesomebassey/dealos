@@ -14,7 +14,7 @@ import {
 
 const items = [
   ["/dashboard", "Home", LayoutDashboard],
-  ["/listings", "Marketplace", Store],
+  ["/marketplace", "Marketplace", Store],
   ["/deals", "My deals", Handshake],
   ["/data-room", "Documents", Files],
   ["/due-diligence", "Due diligence", SearchCheck],

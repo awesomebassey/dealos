@@ -18,7 +18,7 @@ export default async function ReviewAccount({params}:{params:Promise<{userId:str
     return <section key={cat} className="card" style={{marginBottom:18}}>
       <div className="section-head"><h2 className="section-title">{sentence(cat)}</h2>{pending&&<ReviewCategory userId={userId} category={cat}/>}</div>
       {evidence.length?<div className="table-wrap"><table><thead><tr><th>Document</th><th>Sample file</th><th>Decision</th></tr></thead>
-        <tbody>{evidence.map(e=><tr key={e.id}><td>{sentence(e.documentType)}</td><td>{e.fileName}</td><td>{sentence(e.status)}</td></tr>)}</tbody>
+        <tbody>{evidence.map(e=><tr key={e.id}><td>{sentence(e.documentType)}</td><td><a className="text-link" href={(process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000")+"/api/kyc/evidence/"+e.id+"/sample"} target="_blank" rel="noreferrer">{e.fileName}</a></td><td>{sentence(e.status)}</td></tr>)}</tbody>
       </table></div>:<div className="empty"><p>No samples submitted for this section.</p></div>}
     </section>;
   })}

@@ -12,6 +12,9 @@ import {
   LedgerDirection,
   User,
   UserRole,
+  WalletDirection,
+  WalletTxType,
+  ListingStatus,
 } from "@prisma/client";
 import { fundEscrowSchema, signOffSchema } from "@dealos/contracts";
 import { randomUUID } from "node:crypto";
@@ -61,6 +64,10 @@ export class EscrowService {
     const scope = `escrow:fund:${dealId}`;
     const correlationId = randomUUID();
     const context = await this.dealContext(dealId, actor);
+    if (context.buyerId !== actor.id) throw new ForbiddenException("Only this deal's buyer can fund escrow");
+    if (process.env.DEALOS_DEMO_FINANCE_ENABLED !== "true") throw new ForbiddenException("Simulated funding is disabled");
+    const kyc = await this.prisma.kycCase.findUnique({where:{userId:actor.id}});
+    if (!kyc?.identityVerified) throw new ForbiddenException("Complete demo identity verification first");
 
     if (!([DealStage.ESCROW, DealStage.ASSET_TRANSFER] as DealStage[]).includes(context.stage)) {
       throw new ConflictException("Deal must be in escrow before funding");
@@ -86,6 +93,23 @@ export class EscrowService {
         throw new ConflictException("Funding amount must match the agreed escrow amount");
       }
 
+      const claimed=await tx.escrowAccount.updateMany({
+        where:{id:escrow.id,status:escrow.status},
+        data:{status:EscrowStatus.FUNDED},
+      });
+      if(claimed.count!==1) throw new ConflictException("Escrow was funded by another request");
+      const wallet=await tx.walletAccount.findUnique({where:{userId:actor.id}});
+      if(!wallet) throw new ConflictException("Create and fund your demo wallet first");
+      const debited=await tx.walletAccount.updateMany({
+        where:{id:wallet.id,balanceMinor:{gte:escrow.amountMinor}},
+        data:{balanceMinor:{decrement:escrow.amountMinor}},
+      });
+      if(debited.count!==1) throw new ConflictException("Insufficient demo wallet balance");
+      await tx.walletTransaction.create({data:{
+        walletId:wallet.id,dealId,direction:WalletDirection.DEBIT,
+        type:WalletTxType.ESCROW_FUNDING,amountMinor:escrow.amountMinor,
+        idempotencyKey:`escrow-fund:${dealId}`,
+      }});
       await tx.idempotencyRecord.create({ data: { scope, key: idempotencyKey, requestHash } });
       const transaction = await tx.escrowTransaction.create({
         data: {
@@ -122,10 +146,6 @@ export class EscrowService {
         ],
       });
 
-      await tx.escrowAccount.update({
-        where: { id: escrow.id },
-        data: { status: EscrowStatus.FUNDED },
-      });
       await tx.idempotencyRecord.update({
         where: { scope_key: { scope, key: idempotencyKey } },
         data: { resultId: transaction.id },
@@ -156,6 +176,11 @@ export class EscrowService {
   async signOff(dealId: string, actor: User, payload: unknown) {
     const input = signOffSchema.parse(payload);
     const context = await this.dealContext(dealId, actor);
+    if (context.stage !== DealStage.ASSET_TRANSFER) throw new ConflictException("Start asset transfer before confirming completion");
+    const items=await this.prisma.assetTransferItem.findMany({where:{dealId}});
+    if(!items.length || items.some(item=>!item.buyerDone || !item.sellerDone)) {
+      throw new ConflictException("Both parties must complete every asset-transfer item first");
+    }
     const expectedRole = input.party === "BUYER" ? UserRole.BUYER : UserRole.SELLER;
     if (actor.role !== expectedRole) throw new ForbiddenException(`Only the ${input.party.toLowerCase()} can sign this confirmation`);
     if (!([EscrowStatus.FUNDED, EscrowStatus.TRANSFER_IN_PROGRESS, EscrowStatus.VERIFICATION, EscrowStatus.RELEASE_PENDING] as EscrowStatus[]).includes(context.escrow!.status)) {
@@ -246,7 +271,18 @@ export class EscrowService {
       const escrow = await tx.escrowAccount.findUniqueOrThrow({ where: { dealId } });
       const blocker = escrowReleaseBlocker(escrow);
       if (blocker) throw new ConflictException(blocker);
-
+      const deal=await tx.deal.findUniqueOrThrow({where:{id:dealId},include:{participants:true}});
+      const assets=await tx.assetTransferItem.findMany({where:{dealId}});
+      if(deal.stage!==DealStage.ASSET_TRANSFER || !assets.length || assets.some(a=>!a.buyerDone || !a.sellerDone)) {
+        throw new ConflictException("Asset transfer must be confirmed before release");
+      }
+      const seller=deal.participants.find(p=>p.role===UserRole.SELLER);
+      if(!seller) throw new ConflictException("Seller not found");
+      const claimed=await tx.escrowAccount.updateMany({
+        where:{id:escrow.id,status:EscrowStatus.RELEASE_PENDING},
+        data:{status:EscrowStatus.RELEASED},
+      });
+      if(claimed.count!==1) throw new ConflictException("Escrow release is already in progress");
       await tx.idempotencyRecord.create({ data: { scope, key: idempotencyKey, requestHash } });
       const transaction = await tx.escrowTransaction.create({
         data: {
@@ -281,7 +317,13 @@ export class EscrowService {
           },
         ],
       });
-      await tx.escrowAccount.update({ where: { id: escrow.id }, data: { status: EscrowStatus.RELEASED } });
+      const sellerWallet=await tx.walletAccount.upsert({where:{userId:seller.userId},create:{userId:seller.userId},update:{}});
+      await tx.walletAccount.update({where:{id:sellerWallet.id},data:{balanceMinor:{increment:escrow.amountMinor}}});
+      await tx.walletTransaction.create({data:{
+        walletId:sellerWallet.id,dealId,direction:WalletDirection.CREDIT,type:WalletTxType.ESCROW_RELEASE,
+        amountMinor:escrow.amountMinor,idempotencyKey:`escrow-release:${dealId}`,
+      }});
+      await tx.listing.update({where:{id:deal.listingId},data:{status:ListingStatus.SOLD}});
       await tx.deal.update({ where: { id: dealId }, data: { stage: DealStage.COMPLETED, version: { increment: 1 } } });
       await tx.idempotencyRecord.update({ where: { scope_key: { scope, key: idempotencyKey } }, data: { resultId: transaction.id } });
       await this.audit.create({

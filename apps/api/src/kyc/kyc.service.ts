@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { EvidenceCategory, EvidenceStatus, KycStatus, User, UserRole } from "@prisma/client";
 import { evidenceUploadSchema, verificationReviewSchema } from "@dealos/contracts";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { PrismaService } from "../prisma/prisma.service";
 import { serialize } from "../common/serialize";
@@ -84,6 +84,34 @@ export class KycService {
       });
       return serialize({id:result.id,category:result.category,status:result.status,fileName:result.fileName});
     } catch(error){ await rm(filePath,{force:true}); throw error; }
+  }
+
+  async sample(evidenceId:string,actor:User) {
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED!=="true"){
+      throw new ForbiddenException("Synthetic evidence previews are disabled");
+    }
+    const evidence=await this.prisma.verificationEvidence.findUnique({
+      where:{id:evidenceId},include:{kycCase:{select:{userId:true}}},
+    });
+    if(!evidence) throw new NotFoundException("Sample not found");
+    const reviewer=actor.role===UserRole.ADVISOR || actor.role===UserRole.ADMIN;
+    if(!reviewer && actor.id!==evidence.kycCase.userId){
+      throw new ForbiddenException("You cannot access this sample");
+    }
+    const [owner,fileId]=evidence.storageKey.split("/");
+    if(owner!==evidence.kycCase.userId || !/^[0-9a-f-]{36}$/.test(fileId||"")){
+      throw new NotFoundException("Sample not found");
+    }
+    let bytes:Buffer;
+    try {bytes=await readFile(join(storageDir,owner,fileId));}
+    catch {throw new NotFoundException("Sample file is unavailable");}
+    await this.prisma.auditEvent.create({data:{
+      actorId:actor.id,resourceType:"KYC_EVIDENCE",resourceId:evidenceId,
+      action:"DEMO_EVIDENCE_VIEWED",
+      metadata:{category:evidence.category,documentType:evidence.documentType},
+      correlationId:randomUUID(),
+    }});
+    return {bytes,contentType:evidence.contentType};
   }
 
   async review(userId:string,actor:User,payload:unknown) {

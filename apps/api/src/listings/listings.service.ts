@@ -88,7 +88,7 @@ export class ListingsService {
     if (!kyc?.identityVerified || !kyc.businessVerified || !kyc.revenueVerified) {
       throw new ForbiddenException("Complete identity, business and revenue verification before publishing");
     }
-    if (![ListingStatus.DRAFT,ListingStatus.ARCHIVED].includes(listing.status)) {
+    if (!(listing.status === ListingStatus.DRAFT || listing.status === ListingStatus.ARCHIVED)) {
       throw new ConflictException("Only draft or archived listings can be published");
     }
     const updated=await this.prisma.$transaction(async tx=>{

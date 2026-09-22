@@ -25,7 +25,7 @@ export class DataRoomService {
   if(!deal) throw new NotFoundException("Deal not found");
   if(deal.stage==="WITHDRAWN") throw new ForbiddenException("Access to withdrawn acquisitions has ended");
   const participant=deal.participants.some(p=>p.userId===actor.id);
-  if(!(actor.role === UserRole.ADMIN || actor.role === UserRole.ADVISOR) && !participant) throw new ForbiddenException("Not a participant in this acquisition");
+  if(actor.role !== UserRole.ADMIN && !participant) throw new ForbiddenException("Not a participant in this acquisition");
   const signed=deal.ndaAgreements.some(n=>n.userId===actor.id && n.status===NdaStatus.SIGNED);
   const privileged=(actor.role === UserRole.ADMIN || actor.role === UserRole.ADVISOR || actor.role === UserRole.SELLER);
   return {deal,allowed:privileged||signed};

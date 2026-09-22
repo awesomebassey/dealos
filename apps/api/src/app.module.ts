@@ -8,6 +8,7 @@ import { DataRoomModule } from "./data-room/data-room.module";
 import { DiligenceModule } from "./diligence/diligence.module";
 import { EscrowModule } from "./escrow/escrow.module";
 import { KycModule } from "./kyc/kyc.module";
+import { WalletModule } from "./wallet/wallet.module";
 import { OffersModule } from "./offers/offers.module";
 import { ListingsModule } from "./listings/listings.module";
 import { OutboxWorker } from "./common/outbox.worker";
@@ -26,6 +27,7 @@ import { OutboxWorker } from "./common/outbox.worker";
     KycModule,
     ListingsModule,
     OffersModule,
+    WalletModule,
   ],
 })
 export class AppModule {}

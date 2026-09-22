@@ -12,6 +12,7 @@ import { WalletModule } from "./wallet/wallet.module";
 import { OffersModule } from "./offers/offers.module";
 import { ListingsModule } from "./listings/listings.module";
 import { OutboxWorker } from "./common/outbox.worker";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   providers: [OutboxWorker],
@@ -28,6 +29,7 @@ import { OutboxWorker } from "./common/outbox.worker";
     ListingsModule,
     OffersModule,
     WalletModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

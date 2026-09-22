@@ -96,10 +96,9 @@ export class DataRoomService {
    await this.audit.create({dealId,actor,resourceType:"DATA_ROOM_DOCUMENT",resourceId:documentId,
      action:"DOCUMENT_OPENED",metadata:{name:document.name},correlationId},tx);
   });
-  const origin=process.env.API_PUBLIC_BASE_URL || "http://localhost:4000";
   return {document:{id:document.id,name:document.name},
-   signedUrl:`${origin.replace(/\/$/,"")}/api/data-room/documents/${document.id}/download?dealId=${encodeURIComponent(dealId)}`,
-   expiresInSeconds:0};
+   signedUrl:`/api/data-room/documents/${document.id}/download?dealId=${encodeURIComponent(dealId)}`,
+   expiresInSeconds:null};
  }
 
  async download(documentId:string,dealId:string,actor:User){

@@ -36,6 +36,15 @@ export function currentUser() {
   return api<CurrentUser>("/auth/me");
 }
 
+export async function publicApi<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_URL}/api${path}`, { cache: "no-store" });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `API request failed: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 export type Deal = {
   id: string;
   ref: string;

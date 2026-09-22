@@ -22,7 +22,7 @@ export default async function Marketplace({searchParams}:{
       <main className="public-section">
         <div className="page-head">
           <div><h1>Find your next business.</h1>
-            <p>Explore Nigerian digital businesses, review their commercial profiles and start a private acquisition.</p></div>
+            <p>Explore sample Nigerian digital businesses, review their commercial profiles and start a private acquisition.</p></div>
           <Link href="/register?account=SELLER" className="button secondary">Sell a business <ArrowRight size={15}/></Link>
         </div>
         <form action="/marketplace" className="card card-pad" style={{display:"flex",gap:12,alignItems:"center",marginBottom:28}}>
@@ -30,7 +30,7 @@ export default async function Marketplace({searchParams}:{
           <input name="q" defaultValue={q} className="input" placeholder="Search businesses or sectors" aria-label="Search businesses"/>
           <button className="button" type="submit">Search</button>
         </form>
-        <div className="page-head"><div><h2 className="section-title">{result.total} businesses available</h2>
+        <div className="page-head"><div><h2 className="section-title">{result.total} illustrative businesses available</h2>
           <p>All transactions and prices are displayed in Naira.</p></div>
           <span className="muted">Page {result.page} of {Math.max(1,result.pages)}</span>
         </div>

@@ -6,6 +6,7 @@ import { join } from "node:path";
 function files(root) {
   const out = [];
   for (const name of readdirSync(root)) {
+    if (name === "node_modules" || name === ".next" || name === "dist") continue;
     const path = join(root, name);
     if (statSync(path).isDirectory()) out.push(...files(path));
     else if (/\.(tsx|ts|css)$/.test(path)) out.push(path);

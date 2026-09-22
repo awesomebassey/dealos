@@ -61,6 +61,44 @@ enum LedgerDirection {
   CREDIT
 }
 
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  UNDER_OFFER
+  SOLD
+  ARCHIVED
+}
+
+enum EvidenceCategory {
+  IDENTITY
+  BUSINESS
+  REVENUE
+}
+
+enum EvidenceStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum OfferStatus {
+  SUBMITTED
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum WalletTxType {
+  DEMO_TOPUP
+  ESCROW_FUNDING
+  ESCROW_RELEASE
+}
+
+enum WalletDirection {
+  CREDIT
+  DEBIT
+}
+
 enum KycStatus {
   PENDING
   IN_REVIEW
@@ -98,6 +136,8 @@ model User {
   kycCase        KycCase?
   sessions       Session[]
   resetTokens    PasswordResetToken[]
+  wallet         WalletAccount?
+  submittedOffers AcquisitionOffer[]
   createdAt      DateTime          @default(now())
 }
 
@@ -155,8 +195,12 @@ model Listing {
   ipAssigned            Boolean            @default(false)
   litigationOpen        Boolean            @default(false)
   deals                 Deal[]
+  status                ListingStatus      @default(DRAFT)
   documents             DataRoomDocument[]
   createdAt             DateTime           @default(now())
+
+  @@index([status, createdAt])
+  @@index([organizationId, status])
 }
 
 model Deal {
@@ -176,6 +220,8 @@ model Deal {
   questions           DueDiligenceQuestion[]
   auditEvents         AuditEvent[]
   assetItems          AssetTransferItem[]
+  offer               AcquisitionOffer?
+  walletTransactions  WalletTransaction[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 }
@@ -329,6 +375,66 @@ model KycCase {
   reviewedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  evidence         VerificationEvidence[]
+}
+
+model VerificationEvidence {
+  id           String           @id @default(uuid())
+  caseId       String
+  kycCase      KycCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  category     EvidenceCategory
+  documentType String
+  fileName     String
+  contentType  String
+  fileSize     Int
+  storageKey   String           @unique
+  status       EvidenceStatus   @default(SUBMITTED)
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime         @default(now())
+
+  @@index([caseId, category, createdAt])
+}
+
+model AcquisitionOffer {
+  id          String      @id @default(uuid())
+  dealId      String      @unique
+  deal        Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  buyerId     String
+  buyer       User        @relation(fields: [buyerId], references: [id])
+  amountMinor BigInt
+  message     String?
+  status      OfferStatus @default(SUBMITTED)
+  reviewedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model WalletAccount {
+  id           String              @id @default(uuid())
+  userId       String              @unique
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceMinor BigInt              @default(0)
+  transactions WalletTransaction[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model WalletTransaction {
+  id             String          @id @default(uuid())
+  walletId       String
+  wallet         WalletAccount   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  dealId         String?
+  deal           Deal?           @relation(fields: [dealId], references: [id])
+  direction      WalletDirection
+  type           WalletTxType
+  amountMinor    BigInt
+  idempotencyKey String
+  createdAt      DateTime        @default(now())
+
+  @@unique([walletId, idempotencyKey])
+  @@index([dealId, createdAt])
 }
 
 model AuditEvent {

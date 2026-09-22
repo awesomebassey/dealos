@@ -40,6 +40,18 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
       - run: npm run db:deploy
+      - name: Test reviewer bootstrap against fresh database
+        env:
+          DEALOS_BOOTSTRAP_REVIEWER: "true"
+          DEALOS_REVIEWER_NAME: CI Reviewer
+          DEALOS_REVIEWER_EMAIL: ci-reviewer@example.test
+          DEALOS_REVIEWER_PASSWORD: "CI-Reviewer-Synthetic-Password-2026"
+        run: |
+          npm run auth:bootstrap-reviewer
+          if npm run auth:bootstrap-reviewer; then
+            echo "Bootstrap wrongly allowed a second reviewer"
+            exit 1
+          fi
       - run: npm run db:seed
       - run: npm run test:static
       - run: npm run test

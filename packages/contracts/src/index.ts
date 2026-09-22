@@ -92,6 +92,10 @@ export const verificationReviewSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+export const sellerDiligenceAnswerSchema = z.object({
+  answer: z.string().trim().min(3).max(2000),
+});
+
 export const submitOfferSchema = z.object({
   amountNaira: z.number().int().min(10000).max(10000000000),
   message: z.string().trim().max(2000).optional(),

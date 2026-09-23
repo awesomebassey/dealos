@@ -189,9 +189,11 @@ export async function runNativeBrowserSmoke(){
   try{
     const ws=await until(()=>{
       const match=output.match(/DevTools listening on (ws:\/\/[^\s]+)/);
-      if(proc.exitCode!==null)throw new Error("Browser exited: "+output.slice(-800));
+      if(proc.exitCode!==null)throw new Error("Browser exited: "+output.slice(-1400));
       return match?.[1];
-    },"Chrome remote debugger");
+    },"Chrome remote debugger",45_000).catch(error=>{
+      throw new Error(error.message+"; binary="+chrome+"; Chrome stderr="+output.slice(-2200));
+    });
     const url=new URL(ws);
     const debuggerOrigin="http://"+url.host;
     browser=await Devtools.connect(ws);

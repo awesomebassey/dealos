@@ -77,6 +77,10 @@ export class KycService {
           fileName,contentType:input.contentType,fileSize:bytes.length,storageKey:key,contentBytes:bytes,
         }});
         await tx.auditEvent.create({data:{actorId:actor.id,resourceType:"KYC_EVIDENCE",resourceId:evidence.id,action:"DEMO_EVIDENCE_SUBMITTED",metadata:{category:input.category,documentType:input.documentType},correlationId:randomUUID()}});
+        await tx.outboxEvent.create({data:{
+          topic:"kyc.evidence_submitted",aggregateId:item.id,
+          payload:{userId:actor.id,evidenceId:evidence.id,category:input.category},
+        }});
         return evidence;
       });
     return serialize({id:result.id,category:result.category,status:result.status,fileName:result.fileName});

@@ -7,7 +7,7 @@ export default async function AssetTransfer({params}:{params:Promise<{id:string}
  const {id}=await params;const [user,deal]=await Promise.all([currentUser(),api<Deal>(`/deals/${id}`)]);
  return <>
    <div className="page-head"><div><h1>Asset transfer</h1><p>Track the handover of {deal.listing.name} and confirm completion from each side.</p></div></div>
-   {deal.stage!=="ASSET_TRANSFER"&&deal.stage!=="COMPLETED"&&<div className="warning-panel" style={{marginBottom:20}}>Asset transfer begins after the accepted offer, closing review and simulated escrow funding.</div>}
+   {deal.stage!=="ASSET_TRANSFER"&&deal.stage!=="COMPLETED"&&<p className="muted" style={{marginBottom:20}}>The handover opens after escrow funding.</p>}
    <section className="card">
      <div className="section-head"><h2 className="section-title">Handover checklist</h2><span className="muted">{deal.assetItems.length} items</span></div>
      {deal.assetItems.length?<div className="table-wrap"><table><thead><tr><th>Asset</th><th>Buyer</th><th>Seller</th><th></th></tr></thead>

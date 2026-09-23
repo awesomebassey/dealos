@@ -331,3 +331,9 @@ tbody tr:hover { background:#fbfcfa; }
 .upload-target:hover{border-color:var(--green)}
 @media(max-width:1000px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:660px){.market-grid{grid-template-columns:1fr}}
+
+@media(max-width:720px){
+  .public-header{padding-inline:16px;gap:10px}
+  .public-actions>.muted{display:none}
+  .public-actions .button{padding-inline:10px}
+}

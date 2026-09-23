@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { cp, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {runNativeBrowserSmoke} from "./browser-native-smoke.mjs";
@@ -20,6 +21,19 @@ function serverEntry(){
   const match=candidates.find(path=>existsSync(path));
   if(!match)throw new Error("Next standalone server was not built: "+candidates.join(", "));
   return match;
+}
+async function prepareStandalone(){
+  const entry=serverEntry();
+  const standaloneApp=dirname(entry);
+  const staticDir=join(webCwd,".next/static");
+  assert.ok(existsSync(staticDir),"Build must generate Next.js browser assets");
+  await mkdir(join(standaloneApp,".next"),{recursive:true});
+  await cp(staticDir,join(standaloneApp,".next/static"),{recursive:true,force:true});
+  const publicDir=join(webCwd,"public");
+  if(existsSync(publicDir)){
+    await cp(publicDir,join(standaloneApp,"public"),{recursive:true,force:true});
+  }
+  return entry;
 }
 function start(entry,cwd,env){
   const logs=[];
@@ -78,7 +92,7 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   t.after(async()=>close(api));
   await ready(apiOrigin,"/api/health",api);
 
-  const web=start(serverEntry(),webCwd,{PORT:"3000",HOSTNAME:"127.0.0.1",
+  const web=start(await prepareStandalone(),webCwd,{PORT:"3000",HOSTNAME:"127.0.0.1",
     API_INTERNAL_URL:apiOrigin});
   t.after(async()=>close(web));
   await ready(webOrigin,"/",web);
@@ -90,7 +104,12 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   assert.ok(listing.includes("KoraMetrics"));
   assert.ok(listing.includes("Asking price"));
   await page("/register");
-  await page("/login");
+  const loginHtml=await page("/login");
+  const bundles=[...loginHtml.matchAll(/src="([^"]*\/_next\/static\/[^"]+\.js[^"]*)"/g)];
+  assert.ok(bundles.length>0,"Login must include at least one client-side JavaScript bundle");
+  const bundleResponse=await fetch(webOrigin+bundles[0][1].replaceAll("&amp;","&"));
+  assert.equal(bundleResponse.status,200,"The production standalone server must serve its client bundle");
+  assert.match(bundleResponse.headers.get("content-type")||"",/javascript/);
 
   const buyerCookie=await login("amara@northstar.capital");
   const buyerHome=await page("/dashboard",buyerCookie);

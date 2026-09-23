@@ -89,8 +89,8 @@ npm ci
 npm run db:generate
 npm run db:deploy
 DEALOS_ALLOW_DESTRUCTIVE_SEED=true DEALOS_SEED_LISTING_COUNT=100 npm run db:seed
-DEALOS_SMOKE_DEMO_PASSWORD="<your local demo fixture password>" npm run test:smoke
 npm run build
+DEALOS_SMOKE_DEMO_PASSWORD="<your local demo fixture password>" npm run test:smoke
 ```
 
 CI supplies the fixture password for its isolated ephemeral database. The full API test covers account registration, independent business review, confidential file access, two competing offers, manual escrow opening, idempotent wallet funding, asset transfer, and a single seller payout. The web test renders the public and authenticated Next.js routes against the actual API.

@@ -65,7 +65,8 @@ class BrowserPage {
     return this.eval("(()=>({path:location.pathname,ready:document.readyState,body:document.body.innerText.slice(-1000),"+
       "form:[...document.querySelectorAll('form')].map(f=>({action:f.action,buttons:[...f.querySelectorAll('button')].map(b=>"+
       "({label:b.textContent.trim(),disabled:b.disabled,hydrated:Object.keys(b).some(k=>k.startsWith('__reactProps'))})),inputs:"+
-      "[...f.querySelectorAll('input')].map(i=>({name:i.name,filled:!!i.value,valid:i.validity.valid}))}))}))()");
+      "[...f.querySelectorAll('input')].map(i=>({name:i.name,filled:!!i.value,valid:i.validity.valid}))})),"+
+      "requests:(window.__dealosRequests||[]).slice(-30)}))()");
   }
   async eval(expression){
     const result=await this.cdp.send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
@@ -128,6 +129,31 @@ async function newPage(browser,debuggerOrigin){
   const session=await Devtools.connect(details.webSocketDebuggerUrl);
   await session.send("Page.enable");
   await session.send("Runtime.enable");
+  // Record only API response codes and synthetic review errors. This identifies
+  // whether a browser click actually sent a request without exposing cookies.
+  await session.send("Page.addScriptToEvaluateOnNewDocument",{source:`
+    (() => {
+      window.__dealosRequests = [];
+      const original = window.fetch.bind(window);
+      window.fetch = async (...args) => {
+        const response = await original(...args);
+        try {
+          const request = args[0];
+          const url = new URL(typeof request === 'string' ? request : request.url, location.href);
+          if (url.pathname.startsWith('/api/')) {
+            const method = (args[1]?.method || request?.method || 'GET').toUpperCase();
+            const item = {path:url.pathname,method,status:response.status};
+            window.__dealosRequests.push(item);
+            if (window.__dealosRequests.length > 80) window.__dealosRequests.shift();
+            if (!response.ok && url.pathname.includes('/review')) {
+              response.clone().text().then(body => {item.error = body.slice(0,400)}).catch(() => {});
+            }
+          }
+        } catch {}
+        return response;
+      };
+    })();
+  `});
   return new BrowserPage(targetId,session);
 }
 async function signIn(page,email,password){

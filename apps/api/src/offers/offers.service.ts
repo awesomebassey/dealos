@@ -43,11 +43,13 @@ export class OffersService {
       if(!deal.offer || deal.offer.status!==OfferStatus.SUBMITTED) throw new ConflictException("This offer cannot be reviewed");
       if(accept) {
         const sellerKyc=await tx.kycCase.findUnique({where:{userId:actor.id}});
-        if(!sellerKyc?.identityVerified || !sellerKyc.businessVerified || !sellerKyc.revenueVerified) throw new ForbiddenException("Complete seller verification to accept offers");
+        const listingReview=await tx.listingVerification.findUnique({where:{listingId:deal.listingId}});
+        if(!sellerKyc?.identityVerified || !listingReview?.businessVerified || !listingReview.revenueVerified){
+          throw new ForbiddenException("Complete personal and business-specific reviews before accepting an offer");
+        }
         const locked=await tx.listing.updateMany({where:{id:deal.listingId,status:ListingStatus.PUBLISHED},data:{status:ListingStatus.UNDER_OFFER}});
         if(locked.count!==1) throw new ConflictException("Another offer was accepted or the listing is unavailable");
         await tx.deal.update({where:{id:deal.id},data:{agreedPriceMinor:deal.offer.amountMinor,stage:DealStage.LOI,version:{increment:1}}});
-        await tx.escrowAccount.create({data:{dealId,amountMinor:deal.offer.amountMinor,currency:"NGN",status:"CREATED"}});
         await tx.assetTransferItem.createMany({data:[
           "Primary business domain and DNS",
           "Source code and deployment access",

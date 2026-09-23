@@ -105,7 +105,7 @@ export class EscrowService {
     const correlationId = randomUUID();
     const context = await this.dealContext(dealId, actor);
     if (context.buyerId !== actor.id) throw new ForbiddenException("Only this deal's buyer can fund escrow");
-    if (process.env.DEALOS_DEMO_FINANCE_ENABLED === "false") throw new ForbiddenException("Simulated funding is disabled");
+    if (process.env.DEALOS_DEMO_FINANCE_ENABLED !== "true") throw new ForbiddenException("Simulated funding is disabled");
     const kyc = await this.prisma.kycCase.findUnique({where:{userId:actor.id}});
     if (!kyc?.identityVerified) throw new ForbiddenException("Complete demo identity verification first");
 

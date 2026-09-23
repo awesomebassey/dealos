@@ -20,7 +20,7 @@ export class WalletService {
   async topup(actor:User,body:unknown,idempotencyKey?:string){
     if(actor.role!==UserRole.BUYER) throw new ForbiddenException("Demo top-ups are available to buyers");
     if(!idempotencyKey || idempotencyKey.length>120) throw new ConflictException("Valid Idempotency-Key header required");
-    if(process.env.DEALOS_DEMO_FINANCE_ENABLED!=="true") throw new ForbiddenException("Simulated funding is disabled");
+    if(process.env.DEALOS_DEMO_FINANCE_ENABLED==="false") throw new ForbiddenException("Simulated funding is disabled");
     const input=walletTopupSchema.parse(body);
     const amountMinor=BigInt(input.amountNaira)*100n;
     return serialize(await this.prisma.$transaction(async tx=>{

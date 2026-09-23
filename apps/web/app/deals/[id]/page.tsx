@@ -3,6 +3,7 @@ import { api,currentUser,money,sentence } from "../../../lib/api";
 import { Pipeline } from "../../../components/pipeline";
 import { DealActions } from "../../../components/deal-actions";
 import { OfferActions } from "../../../components/offer-actions";
+import { CreateEscrowButton } from "../../../components/create-escrow-button";
 type Offer={id:string;status:string;amountMinor:string;message?:string|null};
 type Audit={id:string;action:string;metadata?:{summary?:string};actor?:{name:string}|null;createdAt:string};
 type Deal={id:string;ref:string;stage:string;version:number;agreedPriceMinor:string|null;
@@ -13,7 +14,9 @@ export default async function DealPage({params}:{params:Promise<{id:string}>}){
  const {id}=await params;const [user,deal]=await Promise.all([currentUser(),api<Deal>(`/deals/${id}`)]);
  return <>
   <div className="page-head"><div><h1>{deal.listing.name}</h1><p>{deal.ref} / {deal.listing.category}</p></div>
-    <DealActions dealId={id} stage={deal.stage} version={deal.version} userRole={user.role} hasEscrow={!!deal.escrow} escrowStatus={deal.escrow?.status}/></div>
+    {["ADVISOR","ADMIN"].includes(user.role)&&deal.stage==="SPA"&&!deal.escrow&&deal.offer?.status==="ACCEPTED" ?
+      <CreateEscrowButton dealId={id}/>:
+      <DealActions dealId={id} stage={deal.stage} version={deal.version} userRole={user.role} hasEscrow={!!deal.escrow} escrowStatus={deal.escrow?.status}/> }</div>
   <section className="card"><div className="section-head"><h2 className="section-title">Acquisition progress</h2><span className="status active">{sentence(deal.stage)}</span></div>
     <Pipeline stage={deal.stage}/></section>
   <div className="grid stats" style={{marginTop:16}}>

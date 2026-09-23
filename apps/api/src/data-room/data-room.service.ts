@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { NdaStatus, User, UserRole } from "@prisma/client";
 import { dataRoomUploadSchema } from "@dealos/contracts";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -52,7 +52,7 @@ export class DataRoomService {
 
  async upload(actor:User,payload:unknown){
   if(actor.role!==UserRole.SELLER) throw new ForbiddenException("Seller account required");
-  if(process.env.DEALOS_DEMO_DOCUMENTS_ENABLED!=="true") throw new ForbiddenException("Sandbox document uploads are disabled");
+  if(process.env.DEALOS_DEMO_DOCUMENTS_ENABLED==="false") throw new ForbiddenException("Sandbox document uploads are disabled");
   const input=dataRoomUploadSchema.parse(payload);
   const listing=await this.prisma.listing.findUnique({where:{id:input.listingId}});
   if(!listing || listing.organizationId!==actor.organizationId) throw new ForbiddenException("You do not own this listing");
@@ -61,14 +61,10 @@ export class DataRoomService {
     throw new BadRequestException("Use a synthetic PDF, image or CSV file under 4MB");
   }
   const storageKey=`${listing.id}/${randomUUID()}`;
-  const filePath=join(storageDir,...storageKey.split("/"));
-  await mkdir(join(storageDir,listing.id),{recursive:true,mode:0o700});
-  await writeFile(filePath,bytes,{mode:0o600,flag:"wx"});
-  try{
-   const doc=await this.prisma.$transaction(async tx=>{
+  const doc=await this.prisma.$transaction(async tx=>{
     const created=await tx.dataRoomDocument.create({data:{
      listingId:listing.id,name:input.name,category:input.category,objectKey:storageKey,
-     contentType:input.contentType,sizeBytes:bytes.length,
+     contentType:input.contentType,sizeBytes:bytes.length,contentBytes:bytes,
     }});
     await tx.auditEvent.create({data:{
      actorId:actor.id,resourceType:"DATA_ROOM_DOCUMENT",resourceId:created.id,
@@ -76,8 +72,7 @@ export class DataRoomService {
     }});
     return created;
    });
-   return serialize({id:doc.id,name:doc.name,category:doc.category,sizeBytes:doc.sizeBytes});
-  }catch(e){await rm(filePath,{force:true});throw e;}
+  return serialize({id:doc.id,name:doc.name,category:doc.category,sizeBytes:doc.sizeBytes});
  }
 
  private async authorizedDocument(id:string,dealId:string,actor:User){
@@ -103,12 +98,17 @@ export class DataRoomService {
 
  async download(documentId:string,dealId:string,actor:User){
   const document=await this.authorizedDocument(documentId,dealId,actor);
-  const [owner,id]=document.objectKey.split("/");
-  if(owner!==document.listingId || !/^[0-9a-f-]{36}$/.test(id||"")) {
-   throw new NotFoundException("Only uploaded sample files can be downloaded");
-  }
   let bytes:Buffer;
-  try{bytes=await readFile(join(storageDir,owner,id));}catch{throw new NotFoundException("Document contents unavailable");}
+  if(document.contentBytes){
+    bytes=Buffer.from(document.contentBytes);
+  }else{
+    const [owner,id]=document.objectKey.split("/");
+    if(owner!==document.listingId || !/^[0-9a-f-]{36}$/.test(id||"")){
+      throw new NotFoundException("Document contents unavailable");
+    }
+    try{bytes=await readFile(join(storageDir,owner,id));}
+    catch{throw new NotFoundException("Document contents unavailable");}
+  }
   await this.prisma.dataRoomAccess.create({data:{documentId,userId:actor.id,dealId,allowed:true}});
   return {bytes,mime:document.contentType,name:document.name};
  }

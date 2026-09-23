@@ -199,6 +199,7 @@ model Listing {
   deals                 Deal[]
   status                ListingStatus      @default(DRAFT)
   documents             DataRoomDocument[]
+  verification          ListingVerification?
   createdAt             DateTime           @default(now())
 
   @@index([status, createdAt])
@@ -270,6 +271,7 @@ model DataRoomDocument {
   sizeBytes   Int
   active      Boolean          @default(true)
   accesses    DataRoomAccess[]
+  contentBytes Bytes?
   createdAt   DateTime         @default(now())
 }
 
@@ -395,6 +397,7 @@ model VerificationEvidence {
   contentType  String
   fileSize     Int
   storageKey   String           @unique
+  contentBytes Bytes?
   status       EvidenceStatus   @default(SUBMITTED)
   reviewedById String?
   reviewedAt   DateTime?
@@ -402,6 +405,41 @@ model VerificationEvidence {
   createdAt    DateTime         @default(now())
 
   @@index([caseId, category, createdAt])
+}
+
+
+model ListingVerification {
+  id               String             @id @default(uuid())
+  listingId        String             @unique
+  listing          Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  status           KycStatus          @default(PENDING)
+  businessVerified Boolean            @default(false)
+  revenueVerified  Boolean            @default(false)
+  evidence         ListingEvidence[]
+  reviewedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([status, updatedAt])
+}
+
+model ListingEvidence {
+  id              String             @id @default(uuid())
+  verificationId  String
+  verification    ListingVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  category        EvidenceCategory
+  documentType    String
+  fileName        String
+  contentType     String
+  fileSize        Int
+  contentBytes    Bytes?
+  status          EvidenceStatus     @default(SUBMITTED)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  createdAt       DateTime           @default(now())
+
+  @@index([verificationId, category, status])
 }
 
 model AcquisitionOffer {

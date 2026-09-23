@@ -52,7 +52,7 @@ export class KycService {
 
   async submit(actor:User,body:unknown) {
     if(actor.role!==UserRole.BUYER && actor.role!==UserRole.SELLER) throw new ForbiddenException("Verification applies to buyers and sellers");
-    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED==="false") throw new ForbiddenException("Sample uploads are unavailable");
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED !== "true") throw new ForbiddenException("Sample uploads are unavailable");
     const input=evidenceUploadSchema.parse(body);
     if(input.category!==EvidenceCategory.IDENTITY) throw new BadRequestException("Business and revenue evidence must be submitted under a specific business");
     if(!kinds[input.category].includes(input.documentType)) throw new BadRequestException("Document type does not match evidence category");
@@ -83,7 +83,7 @@ export class KycService {
   }
 
   async sample(evidenceId:string,actor:User) {
-    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED==="false"){
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED !== "true"){
       throw new ForbiddenException("Synthetic evidence previews are disabled");
     }
     const evidence=await this.prisma.verificationEvidence.findUnique({

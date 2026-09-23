@@ -4,7 +4,8 @@ import { EscrowActions } from "../../../../components/escrow-actions";
 import { CreateEscrowButton } from "../../../../components/create-escrow-button";
 type Deal={id:string;stage:string;offer?:{status:string}|null;listing:{name:string};escrow?:{status:string;amountMinor:string}|null;assetItems:Array<{buyerDone:boolean;sellerDone:boolean}>};
 type Escrow={status:string;amountMinor:string;buyerSignedOffAt?:string|null;sellerSignedOffAt?:string|null;platformConfirmedAt?:string|null;
- transactions:Array<{id:string;type:string;status:string;amountMinor:string;createdAt:string}>;};
+ transactions:Array<{id:string;type:string;status:string;amountMinor:string;createdAt:string}>;
+ ledgerEntries:Array<{id:string;account:string;direction:string;amountMinor:string;createdAt:string}>;};
 type Wallet={balanceMinor:string};
 export default async function DealEscrow({params}:{params:Promise<{id:string}>}){
  const {id}=await params;const [user,deal]=await Promise.all([currentUser(),api<Deal>(`/deals/${id}`)]);
@@ -34,6 +35,26 @@ export default async function DealEscrow({params}:{params:Promise<{id:string}>})
       <Link className="text-link" href="/wallet">Add simulated funds</Link></div>:<div className="card card-pad"><div className="stat-label">Transfer checklist</div><div className="stat-value">{complete?"Complete":"Pending"}</div>
       <Link className="text-link" href={`/deals/${id}/assets`}>View assets</Link></div>}
   </div>
+  <section className="card card-pad" style={{marginTop:18}}>
+    <h2 className="section-title">Funds movement</h2>
+    <div className="grid three" style={{marginTop:17}}>
+      <div className="card card-pad">
+        <div className="stat-label">Buyer demo wallet</div>
+        <div className="stat-value" style={{fontSize:22}}>{escrow.transactions.some(t=>t.type==="FUND"&&t.status==="SETTLED")?"Debited":"Awaiting funding"}</div>
+        <div className="stat-foot">{escrow.transactions.some(t=>t.type==="FUND"&&t.status==="SETTLED")?money(escrow.amountMinor)+" moved to escrow":"No debit recorded"}</div>
+      </div>
+      <div className="card card-pad">
+        <div className="stat-label">Deal escrow</div>
+        <div className="stat-value" style={{fontSize:22}}>{escrow.status==="RELEASED"?"Released":escrow.status==="CREATED"?"Awaiting funding":"Funded"}</div>
+        <div className="stat-foot">{escrow.status==="RELEASED"?"The escrow account has been settled":escrow.status==="CREATED"?"Buyer funding is the next step":money(escrow.amountMinor)+" allocated to this acquisition"}</div>
+      </div>
+      <div className="card card-pad">
+        <div className="stat-label">Seller demo wallet</div>
+        <div className="stat-value" style={{fontSize:22}}>{escrow.status==="RELEASED"?"Credited":"Awaiting release"}</div>
+        <div className="stat-foot">{escrow.status==="RELEASED"?money(escrow.amountMinor)+" credited once":"Both parties must finish the handover"}</div>
+      </div>
+    </div>
+  </section>
   <section className="card card-pad" style={{marginTop:18}}><h2 className="section-title">Release conditions</h2>
     <div className="list">{[
       ["All assets confirmed",complete],["Buyer sign-off",!!escrow.buyerSignedOffAt],
@@ -45,6 +66,24 @@ export default async function DealEscrow({params}:{params:Promise<{id:string}>})
     {escrow.transactions.length?<div className="table-wrap"><table><thead><tr><th>Action</th><th>Amount</th><th>Status</th><th>Recorded</th></tr></thead><tbody>
       {escrow.transactions.map(t=><tr key={t.id}><td>{sentence(t.type)}</td><td>{money(t.amountMinor)}</td><td>Demo {sentence(t.status)}</td>
         <td>{new Date(t.createdAt).toLocaleString("en-NG")}</td></tr>)}</tbody></table></div>:<div className="empty"><p>No demo escrow activity yet.</p></div>}
+  </section>
+  <section className="card" style={{marginTop:18}}>
+    <div className="section-head">
+      <h2 className="section-title">Escrow ledger</h2>
+      <span className="muted">{escrow.ledgerEntries.length} entries</span>
+    </div>
+    {escrow.ledgerEntries.length?
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Account</th><th>Direction</th><th>Amount</th><th>Recorded</th></tr></thead>
+          <tbody>{escrow.ledgerEntries.map(entry=><tr key={entry.id}>
+            <td>{sentence(entry.account)}</td>
+            <td>{sentence(entry.direction)}</td>
+            <td>{money(entry.amountMinor)}</td>
+            <td>{new Date(entry.createdAt).toLocaleString("en-NG")}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>:<div className="empty"><p>Ledger entries will appear when this escrow is funded.</p></div>}
   </section>
  </>;
 }

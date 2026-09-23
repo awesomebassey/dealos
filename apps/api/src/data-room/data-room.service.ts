@@ -52,7 +52,7 @@ export class DataRoomService {
 
  async upload(actor:User,payload:unknown){
   if(actor.role!==UserRole.SELLER) throw new ForbiddenException("Seller account required");
-  if(process.env.DEALOS_DEMO_DOCUMENTS_ENABLED==="false") throw new ForbiddenException("Sandbox document uploads are disabled");
+  if(process.env.DEALOS_DEMO_DOCUMENTS_ENABLED !== "true") throw new ForbiddenException("Sandbox document uploads are disabled");
   const input=dataRoomUploadSchema.parse(payload);
   const listing=await this.prisma.listing.findUnique({where:{id:input.listingId}});
   if(!listing || listing.organizationId!==actor.organizationId) throw new ForbiddenException("You do not own this listing");

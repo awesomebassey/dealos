@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { sellerDiligenceAnswerSchema } from "@dealos/contracts";
+import { buyerDiligenceQuestionSchema, sellerDiligenceAnswerSchema } from "@dealos/contracts";
 import { FindingSeverity, Prisma, User, UserRole } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -114,6 +114,42 @@ export class DiligenceService {
       this.prisma.dueDiligenceQuestion.findMany({ where: { dealId }, orderBy: { createdAt: "asc" } }),
     ]);
     return serialize({ findings, questions });
+  }
+
+  async ask(dealId: string, actor: User, payload: unknown) {
+    const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.BUYER || deal.buyerId !== actor.id) {
+      throw new ForbiddenException("Only this acquisition's buyer can ask questions");
+    }
+    const input = buyerDiligenceQuestionSchema.parse(payload);
+    return serialize(await this.prisma.$transaction(async tx => {
+      // Serialize buyer questions against deal stage changes and duplicate clicks.
+      await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "id" = ${dealId} FOR UPDATE`;
+      const current = await tx.deal.findUniqueOrThrow({ where: { id: dealId } });
+      if (current.stage !== "DILIGENCE" && current.stage !== "FULL_DILIGENCE") {
+        throw new ConflictException("Buyer questions are only open during diligence");
+      }
+      const existing = await tx.dueDiligenceQuestion.findFirst({
+        where: { dealId, findingId: null, question: input.question },
+      });
+      if (existing) return existing;
+      const question = await tx.dueDiligenceQuestion.create({
+        data: { dealId, question: input.question },
+      });
+      await this.audit.create({
+        dealId, actor, resourceType: "DUE_DILIGENCE_QUESTION", resourceId: question.id,
+        action: "BUYER_ASKED_QUESTION",
+        metadata: { summary: "Buyer asked a business-specific diligence question" },
+        correlationId: randomUUID(),
+      }, tx);
+      await tx.outboxEvent.create({
+        data: {
+          topic: "diligence.question_asked", aggregateId: dealId,
+          payload: { dealId, questionId: question.id },
+        },
+      });
+      return question;
+    }));
   }
 
   async answer(dealId: string, questionId: string, actor: User, payload: unknown) {

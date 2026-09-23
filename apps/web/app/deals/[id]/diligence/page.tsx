@@ -2,7 +2,8 @@ import { api,currentUser } from "../../../../lib/api";
 import { DiligenceActions } from "../../../../components/diligence-actions";
 import { Severity } from "../../../../components/severity";
 import { SellerQuestionAnswer } from "../../../../components/seller-question-answer";
-type Deal={id:string;listing:{name:string}};
+import { BuyerQuestionForm } from "../../../../components/buyer-question-form";
+type Deal={id:string;buyerId:string;stage:string;listing:{name:string}};
 type Result={findings:Array<{id:string;title:string;detail:string;severity:string}>;
   questions:Array<{id:string;question:string;answer?:string|null}>};
 export default async function DealDiligence({params}:{params:Promise<{id:string}>}){
@@ -17,9 +18,10 @@ export default async function DealDiligence({params}:{params:Promise<{id:string}
       <div className="empty"><p>No findings yet. The deal advisor can run a structured review.</p></div>}
     </section>
     <section className="card card-pad"><h2 className="section-title">Questions for the seller</h2>
+      {user.role==="BUYER"&&deal.buyerId===user.id&&["DILIGENCE","FULL_DILIGENCE"].includes(deal.stage)&&<BuyerQuestionForm dealId={id}/>}
       {result.questions.length?result.questions.map((q,i)=><div className="list-row" key={q.id} style={{alignItems:"flex-start"}}>
       <strong style={{color:"var(--green)"}}>{i+1}</strong><div style={{flex:1}}><strong>{q.question}</strong>{q.answer ? <p className="muted">{q.answer}</p> : user.role==="SELLER" ? <SellerQuestionAnswer dealId={id} questionId={q.id}/> : <p className="muted">Awaiting seller response</p>}</div></div>):
-      <div className="empty"><p>Questions generated during diligence will appear here.</p></div>}
+      <div className="empty"><p>No questions yet. Buyers can ask the seller during diligence, and the advisor can run a structured review.</p></div>}
     </section>
   </div>
  </>;

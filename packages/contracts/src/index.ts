@@ -92,6 +92,10 @@ export const verificationReviewSchema = z.object({
   note: z.string().trim().max(500).optional(),
 });
 
+export const buyerDiligenceQuestionSchema = z.object({
+  question: z.string().trim().min(10).max(1000),
+});
+
 export const sellerDiligenceAnswerSchema = z.object({
   answer: z.string().trim().min(3).max(2000),
 });

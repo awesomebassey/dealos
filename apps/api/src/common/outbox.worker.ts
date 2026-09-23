@@ -18,6 +18,7 @@ const dealTitles:Record<string,string>={
   "escrow.created":"Simulated escrow is ready",
   "escrow.funded":"Demo escrow has been funded",
   "escrow.released":"Simulated settlement is complete",
+  "diligence.question_asked":"A buyer asked a diligence question",
   "diligence.question_answered":"A diligence question was answered",
   "diligence.completed":"Due diligence review updated",
 };

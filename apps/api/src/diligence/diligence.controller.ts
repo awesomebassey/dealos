@@ -14,6 +14,11 @@ export class DiligenceController {
     return this.diligence.get(dealId, actor);
   }
 
+  @Post("deals/:dealId/questions")
+  ask(@Param("dealId") dealId: string, @Actor() actor: User, @Body() body: unknown) {
+    return this.diligence.ask(dealId, actor, body);
+  }
+
   @Post("deals/:dealId/questions/:questionId/answer")
   answer(@Param("dealId") dealId: string, @Param("questionId") questionId: string,
     @Actor() actor: User, @Body() body: unknown) {

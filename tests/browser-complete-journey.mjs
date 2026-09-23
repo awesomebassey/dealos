@@ -195,6 +195,13 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
     const protectedResponse=await buyer.eval("(async()=>{const r=await fetch("+JSON.stringify(protectedHref)+",{credentials:'include'});return {status:r.status,type:r.headers.get('content-type'),prefix:(await r.text()).slice(0,5)}})()");
     assert.equal(protectedResponse.status,200,"Signed-in buyer must download the protected sample");
     assert.equal(protectedResponse.prefix,"%PDF-");
+    const customQuestion="Please share the illustrative monthly churn figures and any material customer contract renewals.";
+    await buyer.goto("/deals/"+dealId+"/diligence");
+    await buyer.fill("#buyer-question",customQuestion);
+    await buyer.button("Ask seller");
+    const manual=await apiUntil(buyer,"/diligence/deals/"+dealId,
+      r=>r.questions.some(q=>q.question===customQuestion),until,"buyer-authored diligence question");
+    const manualId=manual.questions.find(q=>q.question===customQuestion).id;
     await buyer.goto("/deals/"+dealId);
     await buyer.fill("#offer-amount","1900000");
     await buyer.button("Submit offer");
@@ -205,9 +212,11 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
     const diligence=await apiUntil(reviewer,"/diligence/deals/"+dealId,r=>r.findings.some(f=>f.code==="CUSTOMER_CONCENTRATION"),until,"advisor diligence");
     assert.ok(diligence.questions.length>0);
     await seller.goto("/deals/"+dealId+"/diligence");
-    await seller.fill("textarea[id^='answer-']","Synthetic customer contract renews annually with a ninety-day notice.");
+    await seller.fill("#answer-"+manualId,"Synthetic customer contract renews annually with a ninety-day notice.");
     await seller.button("Send response");
-    await apiUntil(seller,"/diligence/deals/"+dealId,r=>r.questions.some(q=>q.answer?.includes("renews annually")),until,"seller diligence response");
+    await apiUntil(seller,"/diligence/deals/"+dealId,
+      r=>r.questions.some(q=>q.id===manualId&&q.answer?.includes("renews annually")),until,
+      "seller response to the buyer's question");
     step="offer acceptance and closing";
     await seller.goto("/deals/"+dealId);
     await seller.button("Accept offer");

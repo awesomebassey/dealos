@@ -214,15 +214,28 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    assert.ok(primary.findings.some(f=>f.code==="CUSTOMER_CONCENTRATION"));
    const question=primary.questions.find(q=>q.question.includes("largest customer"));
    assert.ok(question);
+   const customQuestion="Please share the illustrative monthly churn figures and any material customer contract renewals.";
+   await seller.rejects("POST","/diligence/deals/"+deal.id+"/questions",403,{question:customQuestion});
+   await other.rejects("POST","/diligence/deals/"+deal.id+"/questions",403,{question:customQuestion});
+   await buyer.rejects("POST","/diligence/deals/"+competing.id+"/questions",403,{question:customQuestion});
+   const asked=await buyer.post("/diligence/deals/"+deal.id+"/questions",{question:customQuestion});
+   assert.equal(asked.question,customQuestion);
+   assert.equal((await buyer.post("/diligence/deals/"+deal.id+"/questions",{question:customQuestion})).id,asked.id,
+     "A duplicate click must not create another diligence question");
+   await seller.post("/diligence/deals/"+deal.id+"/questions/"+asked.id+"/answer",{
+     answer:"Illustrative monthly churn is under three percent. Customer renewals are annual.",
+   });
    await buyer.rejects("POST","/diligence/deals/"+deal.id+"/questions/"+question.id+"/answer",403,{answer:"Unauthorized answer"});
    await seller.post("/diligence/deals/"+deal.id+"/questions/"+question.id+"/answer",{
      answer:"The illustrative largest customer renews annually, with a ninety-day notice period.",
    });
    const updated=await buyer.get("/diligence/deals/"+deal.id);
    assert.match(updated.questions.find(q=>q.id===question.id).answer,/renews annually/);
+   assert.match(updated.questions.find(q=>q.id===asked.id).answer,/monthly churn/i);
    const competitor=await advisor.post("/diligence/deals/"+competing.id+"/run");
    assert.ok(competitor.questions.length>0);
    assert.ok(competitor.questions.every(q=>!q.answer),"Seller answers must stay with their acquisition");
+   assert.ok(!competitor.questions.some(q=>q.question===customQuestion),"Buyer questions cannot leak to a competing acquisition");
    await buyer.rejects("GET","/diligence/deals/"+competing.id,403);
  });
  await t.test("offer and explicit advisor escrow creation",async()=>{

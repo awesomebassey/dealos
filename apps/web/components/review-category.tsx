@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { clientApi } from "../lib/client-api";
-export function ReviewCategory({userId,category}:{userId:string;category:"IDENTITY"|"BUSINESS"|"REVENUE"}){
+export function ReviewCategory({userId,category}:{userId:string;category:"IDENTITY"}){
  const router=useRouter();const [open,setOpen]=useState(false),[approve,setApprove]=useState(false),[note,setNote]=useState(""),[busy,setBusy]=useState(false);
  async function submit(){
   setBusy(true);
@@ -17,7 +17,7 @@ export function ReviewCategory({userId,category}:{userId:string;category:"IDENTI
     <button type="button" className="button" onClick={()=>{setApprove(true);setOpen(true);}}>Approve demo evidence</button></div>
   <Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="dialog-content">
     <Dialog.Title asChild><h2>{approve?"Approve sample evidence?":"Request corrected samples?"}</h2></Dialog.Title>
-    <Dialog.Description>This records an internal demonstration decision. No real-world validation is performed.</Dialog.Description>
+    <Dialog.Description>Record the result of reviewing the submitted identity sample.</Dialog.Description>
     <div className="field"><label htmlFor="review-note">Review note</label><textarea id="review-note" className="input" style={{height:100,paddingTop:12}} value={note} onChange={e=>setNote(e.target.value)} maxLength={500}/></div>
     <div className="dialog-actions"><Dialog.Close asChild><button className="button secondary">Cancel</button></Dialog.Close>
       <button className="button" onClick={submit} disabled={busy}>{busy?"Saving":"Confirm demo review"}</button></div>

@@ -85,6 +85,10 @@ export class ListingVerificationService {
         actorId:actor.id,resourceType:"LISTING_EVIDENCE",resourceId:evidence.id,
         action:"LISTING_SAMPLE_SUBMITTED",metadata:{listingId:listing.id,category:input.category},correlationId:randomUUID(),
       }});
+      await tx.outboxEvent.create({data:{
+        topic:"listing.verification_submitted",aggregateId:listing.id,
+        payload:{listingId:listing.id,evidenceId:evidence.id,category:input.category},
+      }});
       return evidence;
     });
     return serialize({id:result.id,category:result.category,fileName:result.fileName,status:result.status});

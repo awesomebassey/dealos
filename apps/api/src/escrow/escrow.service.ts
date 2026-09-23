@@ -44,6 +44,46 @@ export class EscrowService {
     return deal;
   }
 
+  async create(dealId:string,actor:User){
+    if(actor.role!==UserRole.ADVISOR&&actor.role!==UserRole.ADMIN){
+      throw new ForbiddenException("An advisor opens escrow after the sale agreement");
+    }
+    const deal=await this.prisma.deal.findUnique({
+      where:{id:dealId},
+      include:{participants:true,offer:true,listing:{include:{verification:true}}},
+    });
+    if(!deal||(!deal.participants.some(p=>p.userId===actor.id)&&actor.role!==UserRole.ADMIN)){
+      throw new NotFoundException("Acquisition not found");
+    }
+    if(deal.stage!==DealStage.SPA||deal.offer?.status!=="ACCEPTED"||!deal.agreedPriceMinor){
+      throw new ConflictException("Escrow opens after an accepted offer and closing agreement");
+    }
+    if(!deal.listing.verification?.businessVerified||!deal.listing.verification.revenueVerified){
+      throw new ForbiddenException("The business must pass its own verification");
+    }
+    const parties=deal.participants.filter(p=>p.role===UserRole.BUYER||p.role===UserRole.SELLER);
+    if(parties.length!==2)throw new ConflictException("Buyer and seller are required");
+    const identity=await this.prisma.kycCase.findMany({where:{userId:{in:parties.map(p=>p.userId)}}});
+    if(identity.length!==2||identity.some(k=>!k.identityVerified)){
+      throw new ForbiddenException("Both participants must complete personal verification");
+    }
+    return serialize(await this.prisma.$transaction(async tx=>{
+      const prior=await tx.escrowAccount.findUnique({where:{dealId}});
+      if(prior)return prior;
+      const escrow=await tx.escrowAccount.create({data:{
+        dealId,amountMinor:deal.agreedPriceMinor!,currency:"NGN",status:EscrowStatus.CREATED,
+      }});
+      const correlationId=randomUUID();
+      await this.audit.create({dealId,actor,resourceType:"ESCROW",resourceId:escrow.id,
+        action:"ESCROW_CREATED",nextState:EscrowStatus.CREATED,
+        metadata:{amountMinor:escrow.amountMinor.toString()},correlationId},tx);
+      await tx.outboxEvent.create({data:{
+        topic:"escrow.created",aggregateId:dealId,payload:{dealId,escrowId:escrow.id,correlationId},
+      }});
+      return escrow;
+    }));
+  }
+
   async get(dealId: string, actor: User) {
     await this.dealContext(dealId, actor);
     const escrow = await this.prisma.escrowAccount.findUniqueOrThrow({
@@ -65,7 +105,7 @@ export class EscrowService {
     const correlationId = randomUUID();
     const context = await this.dealContext(dealId, actor);
     if (context.buyerId !== actor.id) throw new ForbiddenException("Only this deal's buyer can fund escrow");
-    if (process.env.DEALOS_DEMO_FINANCE_ENABLED !== "true") throw new ForbiddenException("Simulated funding is disabled");
+    if (process.env.DEALOS_DEMO_FINANCE_ENABLED === "false") throw new ForbiddenException("Simulated funding is disabled");
     const kyc = await this.prisma.kycCase.findUnique({where:{userId:actor.id}});
     if (!kyc?.identityVerified) throw new ForbiddenException("Complete demo identity verification first");
 

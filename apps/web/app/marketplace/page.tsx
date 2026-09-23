@@ -25,9 +25,9 @@ export default async function Marketplace({searchParams}:{
             <p>Explore sample Nigerian digital businesses, review their commercial profiles and start a private acquisition.</p></div>
           <Link href="/register?account=SELLER" className="button secondary">Sell a business <ArrowRight size={15}/></Link>
         </div>
-        <form action="/marketplace" className="card card-pad" style={{display:"flex",gap:12,alignItems:"center",marginBottom:28}}>
+        <form action="/marketplace" className="card card-pad" style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:28}}>
           <Search size={20} color="var(--muted)"/>
-          <input name="q" defaultValue={q} className="input" placeholder="Search businesses or sectors" aria-label="Search businesses"/>
+          <input name="q" defaultValue={q} className="input" style={{flex:"1 1 180px",minWidth:0}} placeholder="Search businesses or sectors" aria-label="Search businesses"/>
           <button className="button" type="submit">Search</button>
         </form>
         <div className="page-head"><div><h2 className="section-title">{result.total} illustrative businesses available</h2>

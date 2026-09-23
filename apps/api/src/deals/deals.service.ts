@@ -160,7 +160,8 @@ export class DealsService {
         const parties=await tx.dealParticipant.findMany({where:{dealId:id,role:{in:[UserRole.BUYER,UserRole.SELLER]}}});
         const cases=await tx.kycCase.findMany({where:{userId:{in:parties.map(p=>p.userId)}}});
         if(parties.length!==2 || cases.length!==2 || cases.some(k=>!k.identityVerified) ||
-          !cases.some(k=>k.businessVerified && k.revenueVerified)) {
+          !(await tx.listingVerification.findUnique({where:{listingId:deal.listingId}}))?.businessVerified ||
+          !(await tx.listingVerification.findUnique({where:{listingId:deal.listingId}}))?.revenueVerified) {
           throw new ConflictException("Both parties must complete required demo verification");
         }
       }

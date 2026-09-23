@@ -186,7 +186,9 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    },"foreign-"+suffix);
    let stage=await advisor.get("/deals/"+deal.id);
    stage=await advisor.post("/deals/"+deal.id+"/transition",{to:"ASSET_TRANSFER",expectedVersion:stage.version});
-   for(const item of stage.assetItems??[]){
+   stage=await advisor.get("/deals/"+deal.id);
+   assert.ok(stage.assetItems.length>0);
+   for(const item of stage.assetItems){
      await buyer.post("/deals/"+deal.id+"/assets/"+item.id+"/confirm");
      await seller.post("/deals/"+deal.id+"/assets/"+item.id+"/confirm");
    }

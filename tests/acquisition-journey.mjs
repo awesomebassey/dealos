@@ -166,7 +166,15 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    assert.equal((await buyer.post("/listings/"+listing.slug+"/start-deal")).id,deal.id);
    await buyer.rejects("GET","/data-room/deals/"+deal.id+"/documents",403);
    await other.rejects("GET","/data-room/deals/"+deal.id+"/documents",403);
-   await buyer.post("/deals/"+deal.id+"/nda/sign");
+   const [firstSignature,replayedSignature]=await Promise.all([
+     buyer.post("/deals/"+deal.id+"/nda/sign"),
+     buyer.post("/deals/"+deal.id+"/nda/sign"),
+   ]);
+   assert.equal(firstSignature.id,replayedSignature.id,"Concurrent NDA submissions must reuse the same agreement");
+   const signedDeal=await buyer.get("/deals/"+deal.id);
+   assert.equal(signedDeal.version,1,"NDA must advance the deal once");
+   assert.equal(signedDeal.auditEvents.filter(event=>event.action==="NDA_SIGNED").length,1,
+     "Concurrent NDA requests must create only one signed event");
    await other.post("/deals/"+competing.id+"/nda/sign");
    const docs=await buyer.get("/data-room/deals/"+deal.id+"/documents");
    assert.equal(docs.length,1);

@@ -9,7 +9,6 @@ export default async function Wallet(){
  return <>
   <div className="page-head"><div><h1>Demo wallet</h1><p>Illustrative funding and acquisition payouts in Naira.</p></div>
     {user.role==="BUYER"&&<DemoTopup/>}</div>
-  <div className="warning-panel" style={{marginBottom:22}}>Simulation only. This balance is not cash, cannot be withdrawn and cannot pay for a real business.</div>
   <div className="card card-pad" style={{maxWidth:650,marginBottom:20,background:"var(--green-dark)",color:"#fff"}}>
     <div style={{fontSize:14,color:"#d2ddd7"}}>Available demo balance</div>
     <div style={{fontSize:40,fontWeight:750,marginTop:10}}>{money(wallet.balanceMinor)}</div>

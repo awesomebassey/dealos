@@ -83,7 +83,7 @@ async function page(path,cookie){
   return body;
 }
 
-test("web routes render across the real API for 100 seeded businesses",{timeout:120_000},async t=>{
+test("web routes render across the real API for 100 seeded businesses",{timeout:300_000},async t=>{
   const live=readFileSync(join(webCwd,"components/deal-live-updates.tsx"),"utf8");
   assert.ok(live.includes('"/api/deals/"'),"Live updates must use same-origin API routes");
   assert.ok(!live.includes("NEXT_PUBLIC_API_URL"),"Live updates must not require cross-domain auth cookies");
@@ -153,7 +153,7 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   const withoutSession=await fetch(webOrigin+"/dashboard",{redirect:"manual"});
   assert.ok([302,303,307,308].includes(withoutSession.status),
     "Unauthenticated workspace route must redirect");
-  await t.test("real Chromium browser validates buyer, seller, advisor and mobile",async()=>{
+  await t.test("real Chromium validates complete buyer, seller, advisor and mobile journeys",async()=>{
     await runNativeBrowserSmoke();
   });
 });

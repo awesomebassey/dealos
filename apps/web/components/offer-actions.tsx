@@ -37,7 +37,7 @@ export function OfferActions({dealId,role,stage,askingPriceNaira,offer}:{
   </div>
   <Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="dialog-content">
     <Dialog.Title asChild><h2>{decision==="accept"?"Accept this acquisition offer?":"Decline this offer?"}</h2></Dialog.Title>
-    <Dialog.Description>{decision==="accept"?"The listing will stop accepting offers, the agreed price will be recorded and a simulated escrow account will be created.":"The buyer will be notified of the decision within DealOS."}</Dialog.Description>
+    <Dialog.Description>{decision==="accept"?"The listing will stop accepting offers, the agreed price will be recorded. An advisor will open escrow during closing.":"The buyer will be notified of the decision within DealOS."}</Dialog.Description>
     <div className="dialog-actions"><Dialog.Close asChild><button className="button secondary">Cancel</button></Dialog.Close>
       <button className="button" disabled={busy} onClick={respond}>{busy?"Saving":"Confirm decision"}</button></div>
   </Dialog.Content></Dialog.Portal>

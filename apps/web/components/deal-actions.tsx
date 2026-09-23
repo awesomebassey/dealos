@@ -8,13 +8,14 @@ import { toast } from "sonner";
 import { clientApi } from "../lib/client-api";
 const nextStage:Record<string,string>={LOI:"FULL_DILIGENCE",FULL_DILIGENCE:"SPA",SPA:"ESCROW",ESCROW:"ASSET_TRANSFER"};
 const label=(stage:string)=>stage.replaceAll("_"," ").toLowerCase();
-export function DealActions({dealId,stage,version,userRole}:{
- dealId:string;stage:string;version:number;userRole:string;
+export function DealActions({dealId,stage,version,userRole,hasEscrow,escrowStatus}:{
+ dealId:string;stage:string;version:number;userRole:string;hasEscrow?:boolean;escrowStatus?:string;
 }){
  const router=useRouter(),[busy,setBusy]=useState(false),[open,setOpen]=useState(false),[agreed,setAgreed]=useState(false);
  const canSign=userRole==="BUYER"&&stage==="NDA_PENDING";
  const next=nextStage[stage];
- const canAdvance=["ADVISOR","ADMIN"].includes(userRole)&&!!next;
+ const canAdvance=["ADVISOR","ADMIN"].includes(userRole)&&!!next&&
+   !(stage==="SPA"&&!hasEscrow)&&!(stage==="ESCROW"&&escrowStatus!=="FUNDED");
  async function confirm(){
   setBusy(true);
   try{

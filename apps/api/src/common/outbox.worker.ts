@@ -14,6 +14,7 @@ const dealTitles:Record<string,string>={
   "offer.submitted":"A buyer submitted an offer",
   "offer.accepted":"Your acquisition offer was accepted",
   "offer.declined":"Your acquisition offer was declined",
+  "escrow.created":"Simulated escrow is ready",
   "escrow.funded":"Demo escrow has been funded",
   "escrow.released":"Simulated settlement is complete",
   "diligence.question_answered":"A diligence question was answered",
@@ -56,6 +57,54 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       return listing.organization.users.filter(u=>u.role===UserRole.SELLER).map(u=>({
         recipientId:u.id,sourceEventId:event.id,title:"Your business is published",
         description:listing.name,href:`/my-listings/${listing.slug}`,
+      }));
+    }
+
+    if(event.topic==="listing.verification_reviewed"){
+      const listing=await tx.listing.findUnique({
+        where:{id:event.aggregateId},
+        select:{
+          name:true,slug:true,
+          organization:{select:{users:{where:{role:UserRole.SELLER},select:{id:true}}}},
+        },
+      });
+      if(!listing)return [];
+      const payload=event.payload&&typeof event.payload==="object"&&!Array.isArray(event.payload)
+        ?event.payload as Record<string,unknown>:{};
+      const category=typeof payload.category==="string"?payload.category.toLowerCase():"business";
+      const approved=payload.approved===true;
+      return listing.organization.users.map(user=>({
+        recipientId:user.id,sourceEventId:event.id,
+        title:approved?"Your business samples were approved":"Business samples need attention",
+        description:`${listing.name}: ${category} review`,
+        href:`/my-listings/${listing.slug}/verification`,
+      }));
+    }
+    if(event.topic==="kyc.evidence_submitted" || event.topic==="listing.verification_submitted"){
+      const reviewers=await tx.user.findMany({
+        where:{role:{in:[UserRole.ADVISOR,UserRole.ADMIN]}},
+        select:{id:true},
+      });
+      if(!reviewers.length)return [];
+      if(event.topic==="kyc.evidence_submitted"){
+        const payload=event.payload&&typeof event.payload==="object"&&!Array.isArray(event.payload)
+          ?event.payload as Record<string,unknown>:{};
+        const userId=typeof payload.userId==="string"?payload.userId:"";
+        if(!userId)return [];
+        return reviewers.map(user=>({
+          recipientId:user.id,sourceEventId:event.id,title:"Personal sample awaiting review",
+          description:"A buyer or seller submitted identity evidence",
+          href:`/reviews/${userId}`,
+        }));
+      }
+      const listing=await tx.listing.findUnique({
+        where:{id:event.aggregateId},select:{name:true,slug:true},
+      });
+      if(!listing)return [];
+      return reviewers.map(user=>({
+        recipientId:user.id,sourceEventId:event.id,
+        title:"Business sample awaiting review",description:listing.name,
+        href:`/reviews/businesses/${listing.slug}`,
       }));
     }
     if(event.topic==="kyc.reviewed"){

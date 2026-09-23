@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { config } from "dotenv";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { randomBytes, scrypt } from "node:crypto";
 
 function deriveSeedPassword(password: string, salt: Buffer) {
@@ -49,6 +50,18 @@ const ids = {
 };
 
 async function main() {
+  if(process.env.NODE_ENV==="production" || process.env.DEALOS_ALLOW_DESTRUCTIVE_SEED!=="true"){
+    throw new Error("Seed deletes all demo data. Set DEALOS_ALLOW_DESTRUCTIVE_SEED=true in a disposable local/CI database only.");
+  }
+  const dbHost=new URL(connectionString).hostname.toLowerCase();
+  if(!["localhost","127.0.0.1","::1"].includes(dbHost) &&
+    process.env.DEALOS_ALLOW_REMOTE_SEED!=="I_UNDERSTAND_THIS_DELETES_ALL_DATA") {
+    throw new Error("Refusing to erase a remote database. Use a disposable local PostgreSQL instance for demo seeding.");
+  }
+  await prisma.walletTransaction.deleteMany();
+  await prisma.walletAccount.deleteMany();
+  await prisma.verificationEvidence.deleteMany();
+  await prisma.acquisitionOffer.deleteMany();
   await prisma.ledgerEntry.deleteMany();
   await prisma.escrowTransaction.deleteMany();
   await prisma.escrowAccount.deleteMany();
@@ -64,6 +77,8 @@ async function main() {
   await prisma.passwordResetToken.deleteMany();
   await prisma.session.deleteMany();
   await prisma.kycCase.deleteMany();
+  await prisma.listingEvidence.deleteMany();
+  await prisma.listingVerification.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
@@ -138,6 +153,8 @@ async function main() {
       organizationId: ids.sellerOrg,
       name: "KoraMetrics",
       slug: "korametrics",
+      status: "PUBLISHED",
+      verification:{create:{status:KycStatus.VERIFIED,businessVerified:true,revenueVerified:true,reviewedAt:new Date()}},
       category: "SaaS / Analytics",
       country: "Nigeria",
       askingPriceMinor: 65000000000n,
@@ -157,6 +174,7 @@ async function main() {
       id: ids.deal,
       ref: "DL-2026-0042",
       listingId: ids.listing,
+      buyerId: ids.buyer,
       stage: DealStage.FULL_DILIGENCE,
       version: 3,
       agreedPriceMinor: 59500000000n,
@@ -188,50 +206,17 @@ async function main() {
     },
   });
 
-  await prisma.dataRoomDocument.createMany({
-    data: [
-      {
-        listingId: ids.listing,
-        name: "FY2025 P&L.pdf",
-        category: "Financial",
-        objectKey: "korametrics/financial/fy2025-pnl.pdf",
-        contentType: "application/pdf",
-        sizeBytes: 1142032,
-      },
-      {
-        listingId: ids.listing,
-        name: "MRR cohort export.xlsx",
-        category: "Financial",
-        objectKey: "korametrics/financial/mrr-cohorts.xlsx",
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        sizeBytes: 483220,
-      },
-      {
-        listingId: ids.listing,
-        name: "Customer concentration.csv",
-        category: "Customers",
-        objectKey: "korametrics/customers/concentration.csv",
-        contentType: "text/csv",
-        sizeBytes: 98112,
-      },
-      {
-        listingId: ids.listing,
-        name: "IP assignment register.pdf",
-        category: "Legal",
-        objectKey: "korametrics/legal/ip-register.pdf",
-        contentType: "application/pdf",
-        sizeBytes: 720441,
-      },
-      {
-        listingId: ids.listing,
-        name: "Infrastructure overview.pdf",
-        category: "Technical",
-        objectKey: "korametrics/technical/infrastructure.pdf",
-        contentType: "application/pdf",
-        sizeBytes: 820991,
-      },
-    ],
-  });
+  async function sampleDocument(listingId:string,category:string,name:string) {
+    const content=Buffer.from(`SAMPLE DATA ONLY\\nBusiness: ${listingId}\\nDocument: ${name}\\nIllustrative transaction records.\\n`);
+    return {listingId,name,category,objectKey:`${listingId}/${randomUUID()}`,
+      contentType:"text/csv",sizeBytes:content.length,contentBytes:content};
+  }
+  await prisma.dataRoomDocument.createMany({data:[
+    await sampleDocument(ids.listing,"Financial","Illustrative revenue.csv"),
+    await sampleDocument(ids.listing,"Customers","Sample customer mix.csv"),
+    await sampleDocument(ids.listing,"Legal","Illustrative IP checklist.csv"),
+    await sampleDocument(ids.listing,"Technical","Sample infrastructure summary.csv"),
+  ]});
 
   await prisma.escrowAccount.create({
     data: {
@@ -313,7 +298,50 @@ async function main() {
     });
   }
 
-  console.log("DealOS seeded", ids);
+  const count=Math.min(100,Math.max(10,Number(process.env.DEALOS_SEED_LISTING_COUNT)||10));
+  const categories=["SaaS","E-commerce","Logistics","Health technology","Education technology","Fintech","Media","Analytics"];
+  const names=["Lagoon Commerce","Abeokuta Cloud","Northern Dispatch","BrightCampus","Cedar Health","MarketPath","BluePalm Media","Bridge Analytics"];
+  const samples=[];
+  for(let i=1;i<count;i++){
+    const serial=String(i).padStart(3,"0");
+    const orgId=`50000000-0000-0000-0000-${String(i).padStart(12,"0")}`;
+    const sellerId=`60000000-0000-0000-0000-${String(i).padStart(12,"0")}`;
+    const listingId=`70000000-0000-0000-0000-${String(i).padStart(12,"0")}`;
+    const name=`${names[(i-1)%names.length]} ${serial}`;
+    await prisma.organization.create({data:{id:orgId,name:`${name} Ltd`,country:"Nigeria"}});
+    await prisma.user.create({data:{
+      id:sellerId,name:`Demo Seller ${serial}`,email:`seller${serial}@dealos.example`,
+      passwordHash,role:UserRole.SELLER,organizationId:orgId,
+      kycCase:{create:{country:"Nigeria",status:KycStatus.VERIFIED,identityVerified:true,businessVerified:true,revenueVerified:true,reviewedAt:new Date()}},
+    }});
+    const listing=await prisma.listing.create({data:{
+      id:listingId,organizationId:orgId,name,slug:`sample-business-${serial}`,
+      status:"PUBLISHED",category:categories[(i-1)%categories.length],country:"Nigeria",
+      verification:{create:{status:KycStatus.VERIFIED,businessVerified:true,revenueVerified:true,reviewedAt:new Date()}},
+      askingPriceMinor:BigInt(35_000_000+i*1_250_000)*100n,currency:"NGN",
+      annualRevenueMinor:BigInt(12_000_000+i*325_000)*100n,
+      recurringRevenuePct:40+i%55,customerConcentration:12+i%35,
+      revenueTrendPct:(i%4===0?-5:8),ownerHoursPerWeek:10+i%25,
+      ipAssigned:i%3!==0,litigationOpen:false,
+    }});
+    await prisma.dataRoomDocument.create({data:await sampleDocument(listing.id,"Financial",`Illustrative revenue ${serial}.csv`)});
+    samples.push({listing,sellerId});
+  }
+  for(let i=0;i<Math.min(2,samples.length);i++){
+    const sample=samples[i];
+    await prisma.deal.create({data:{
+      ref:`DL-2026-SAMPLE-${i+1}`,listingId:sample.listing.id,buyerId:ids.buyer,
+      stage:i===0?DealStage.DILIGENCE:DealStage.NDA_PENDING,
+      version:i===0?1:0,
+      participants:{create:[
+        {userId:ids.buyer,role:UserRole.BUYER},
+        {userId:sample.sellerId,role:UserRole.SELLER},
+        {userId:ids.advisor,role:UserRole.ADVISOR},
+      ]},
+      ndaAgreements:{create:{userId:ids.buyer,status:i===0?NdaStatus.SIGNED:NdaStatus.PENDING,version:"1.0",signedAt:i===0?new Date():null}},
+    }});
+  }
+  console.log(`DealOS seeded ${count} sample businesses with ${Math.min(2,samples.length)+1} independent deals`);
 }
 
 main().finally(() => prisma.$disconnect());

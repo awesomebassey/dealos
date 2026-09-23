@@ -26,6 +26,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/dealos?schema=public
       NEXT_PUBLIC_API_URL: http://localhost:4000
+      DEALOS_DEMO_VERIFICATION_ENABLED: "true"
+      DEALOS_DEMO_DOCUMENTS_ENABLED: "true"
+      DEALOS_DEMO_FINANCE_ENABLED: "true"
+      DEALOS_ALLOW_DESTRUCTIVE_SEED: "true"
+      DEALOS_SEED_LISTING_COUNT: "100"
+      DEALOS_SMOKE_DEMO_PASSWORD: "DealOS2026!"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,8 +40,22 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run db:generate
-      - run: npm run db:push
+      - run: npm run db:deploy
+      - name: Test reviewer bootstrap against fresh database
+        env:
+          DEALOS_BOOTSTRAP_REVIEWER: "true"
+          DEALOS_REVIEWER_NAME: CI Reviewer
+          DEALOS_REVIEWER_EMAIL: ci-reviewer@example.test
+          DEALOS_REVIEWER_PASSWORD: "CI-Reviewer-Synthetic-Password-2026"
+        run: |
+          npm run auth:bootstrap-reviewer
+          if npm run auth:bootstrap-reviewer; then
+            echo "Bootstrap wrongly allowed a second reviewer"
+            exit 1
+          fi
       - run: npm run db:seed
       - run: npm run test:static
       - run: npm run test
       - run: npm run build
+      - run: npm run test:smoke
+      - run: npm run test:web-smoke

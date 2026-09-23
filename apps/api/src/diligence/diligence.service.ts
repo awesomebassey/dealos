@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { buyerDiligenceQuestionSchema, sellerDiligenceAnswerSchema } from "@dealos/contracts";
 import { FindingSeverity, Prisma, User, UserRole } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -28,7 +29,7 @@ export class DiligenceService {
     });
     if (!deal) throw new NotFoundException("Deal not found");
     const participant = deal.participants.some((p) => p.userId === actor.id);
-    if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role) && !participant) {
+    if (actor.role !== UserRole.ADMIN && !participant) {
       throw new ForbiddenException("You do not have access to this deal");
     }
     return deal;
@@ -115,8 +116,79 @@ export class DiligenceService {
     return serialize({ findings, questions });
   }
 
+  async ask(dealId: string, actor: User, payload: unknown) {
+    const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.BUYER || deal.buyerId !== actor.id) {
+      throw new ForbiddenException("Only this acquisition's buyer can ask questions");
+    }
+    const input = buyerDiligenceQuestionSchema.parse(payload);
+    return serialize(await this.prisma.$transaction(async tx => {
+      // Serialize buyer questions against deal stage changes and duplicate clicks.
+      await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "id" = ${dealId} FOR UPDATE`;
+      const current = await tx.deal.findUniqueOrThrow({ where: { id: dealId } });
+      if (current.stage !== "DILIGENCE" && current.stage !== "FULL_DILIGENCE") {
+        throw new ConflictException("Buyer questions are only open during diligence");
+      }
+      const existing = await tx.dueDiligenceQuestion.findFirst({
+        where: { dealId, findingId: null, question: input.question },
+      });
+      if (existing) return existing;
+      const question = await tx.dueDiligenceQuestion.create({
+        data: { dealId, question: input.question },
+      });
+      await this.audit.create({
+        dealId, actor, resourceType: "DUE_DILIGENCE_QUESTION", resourceId: question.id,
+        action: "BUYER_ASKED_QUESTION",
+        metadata: { summary: "Buyer asked a business-specific diligence question" },
+        correlationId: randomUUID(),
+      }, tx);
+      await tx.outboxEvent.create({
+        data: {
+          topic: "diligence.question_asked", aggregateId: dealId,
+          payload: { dealId, questionId: question.id },
+        },
+      });
+      return question;
+    }));
+  }
+
+  async answer(dealId: string, questionId: string, actor: User, payload: unknown) {
+    const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.SELLER || deal.listing.organizationId !== actor.organizationId) {
+      throw new ForbiddenException("Only this business's seller can answer diligence questions");
+    }
+    if (deal.stage !== "DILIGENCE" && deal.stage !== "FULL_DILIGENCE") {
+      throw new ConflictException("Diligence questions are not open at this transaction stage");
+    }
+    const input = sellerDiligenceAnswerSchema.parse(payload);
+    return this.prisma.$transaction(async tx => {
+      const question = await tx.dueDiligenceQuestion.findFirst({
+        where: { id: questionId, dealId },
+      });
+      if (!question) throw new NotFoundException("Diligence question not found");
+      const updated = await tx.dueDiligenceQuestion.update({
+        where: { id: questionId }, data: { answer: input.answer },
+      });
+      await this.audit.create({
+        dealId, actor, resourceType: "DUE_DILIGENCE_QUESTION", resourceId: questionId,
+        action: "SELLER_ANSWERED_QUESTION",
+        metadata: { summary: "Seller provided a diligence response" },
+        correlationId: randomUUID(),
+      }, tx);
+      await tx.outboxEvent.create({
+        data: { topic: "diligence.question_answered", aggregateId: dealId,
+          payload: { dealId, questionId } },
+      });
+      return serialize(updated);
+    });
+  }
+
   async run(dealId: string, actor: User) {
     const deal = await this.getAuthorizedDeal(dealId, actor);
+    if (actor.role !== UserRole.ADVISOR && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Only a deal advisor can run the diligence review");
+    }
+    if (deal.stage === "WITHDRAWN") throw new ConflictException("This acquisition has ended");
     const results = this.evaluate(deal.listing);
     const correlationId = randomUUID();
 

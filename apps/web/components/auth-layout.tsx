@@ -25,10 +25,10 @@ export function AuthLayout({
           </p>
         </div>
         <div className="auth-points">
-          <div className="auth-point"><BadgeCheck size={18}/><span>Verified buyer and seller accounts</span></div>
+          <div className="auth-point"><BadgeCheck size={18}/><span>Buyer and seller sample evidence reviews</span></div>
           <div className="auth-point"><FileLock2 size={18}/><span>NDA controlled access to confidential documents</span></div>
           <div className="auth-point"><Workflow size={18}/><span>A clear acquisition path with every action recorded</span></div>
-          <div className="auth-point"><Landmark size={18}/><span>Naira escrow with dual-party release controls</span></div>
+          <div className="auth-point"><Landmark size={18}/><span>Simulated Naira escrow with dual-party release controls</span></div>
         </div>
       </section>
       <section className="auth-panel">

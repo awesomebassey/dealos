@@ -87,7 +87,7 @@ export class AuthController {
 
   @Post("change-password")
   @UseGuards(SessionAuthGuard)
-  changePassword(@Actor() actor: User, @Body() body: unknown) {
-    return this.auth.changePassword(actor.id, body);
+  changePassword(@Actor() actor: User, @CurrentSession() session: Session, @Body() body: unknown) {
+    return this.auth.changePassword(actor.id, session.id, body);
   }
 }

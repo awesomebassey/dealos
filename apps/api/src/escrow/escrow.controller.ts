@@ -9,6 +9,11 @@ import { EscrowService } from "./escrow.service";
 export class EscrowController {
   constructor(private readonly escrow: EscrowService) {}
 
+  @Post("deals/:dealId/create")
+  create(@Param("dealId") dealId:string,@Actor() actor:User){
+    return this.escrow.create(dealId,actor);
+  }
+
   @Get("deals/:dealId")
   get(@Param("dealId") dealId: string, @Actor() actor: User) {
     return this.escrow.get(dealId, actor);

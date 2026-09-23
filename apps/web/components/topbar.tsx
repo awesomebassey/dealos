@@ -24,6 +24,9 @@ const titles: Record<string, string> = {
   "/escrow": "Escrow",
   "/kyc": "Verification",
   "/account": "Account",
+  "/my-listings": "My businesses",
+  "/wallet": "Demo wallet",
+  "/reviews": "Review queue",
 };
 
 function titleFor(path: string) {

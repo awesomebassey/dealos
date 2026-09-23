@@ -14,6 +14,7 @@ import {
 } from "@dealos/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { hashPassword, hashToken, randomToken, verifyPassword } from "./password";
+import { assertPasswordRecoveryAvailable, deliverResetLink } from "./reset-mailer";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 30 * 60 * 1000;
@@ -93,60 +94,77 @@ export class AuthService {
   }
 
   async forgotPassword(payload: unknown) {
-    const input = forgotPasswordSchema.parse(payload);
-    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
-    if (!user) return { ok: true };
+    const input=forgotPasswordSchema.parse(payload);
+    // Validate configuration before looking up the address so a missing mailer
+    // never reveals whether a particular account exists.
+    assertPasswordRecoveryAvailable();
+    const user=await this.prisma.user.findUnique({where:{email:input.email}});
+    if(!user)return {ok:true};
 
-    const token = randomToken();
-    await this.prisma.passwordResetToken.deleteMany({ where: { userId: user.id, usedAt: null } });
-    await this.prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + RESET_TTL_MS),
-      },
+    const recent=await this.prisma.passwordResetToken.findFirst({
+      where:{userId:user.id,createdAt:{gt:new Date(Date.now()-60_000)}},
+      orderBy:{createdAt:"desc"},
     });
-    await this.prisma.outboxEvent.create({
-      data: {
-        topic: "auth.password_reset_requested",
-        aggregateId: user.id,
-        payload: { userId: user.id, email: user.email },
-      },
+    if(recent)return {ok:true};
+
+    const token=randomToken();
+    const tokenHash=hashToken(token);
+    await this.prisma.$transaction(async tx=>{
+      await tx.passwordResetToken.deleteMany({where:{userId:user.id,usedAt:null}});
+      await tx.passwordResetToken.create({data:{
+        userId:user.id,tokenHash,expiresAt:new Date(Date.now()+RESET_TTL_MS),
+      }});
     });
 
-    return process.env.NODE_ENV === "production"
-      ? { ok: true }
-      : { ok: true, previewResetToken: token };
+    if(process.env.NODE_ENV==="production"){
+      try{await deliverResetLink(user.email,token);}
+      catch(error){
+        await this.prisma.passwordResetToken.deleteMany({where:{tokenHash}}).catch(()=>undefined);
+        throw error;
+      }
+      return {ok:true};
+    }
+    return {ok:true,previewResetToken:token};
   }
 
   async resetPassword(payload: unknown) {
-    const input = resetPasswordSchema.parse(payload);
-    const reset = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash: hashToken(input.token) },
+    const input=resetPasswordSchema.parse(payload);
+    const reset=await this.prisma.passwordResetToken.findUnique({
+      where:{tokenHash:hashToken(input.token)},
     });
-    if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
-      throw new BadRequestException("This password reset link is invalid or expired");
-    }
-
-    const passwordHash = await hashPassword(input.password);
-    await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
-      this.prisma.passwordResetToken.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-      this.prisma.session.deleteMany({ where: { userId: reset.userId } }),
-    ]);
-    return { ok: true };
+    if(!reset)throw new BadRequestException("This password reset link is invalid or expired");
+    const passwordHash=await hashPassword(input.password);
+    await this.prisma.$transaction(async tx=>{
+      // Claim once inside the transaction. Concurrent requests using the same
+      // recovery link cannot both change the password.
+      const claimed=await tx.passwordResetToken.updateMany({
+        where:{id:reset.id,usedAt:null,expiresAt:{gt:new Date()}},
+        data:{usedAt:new Date()},
+      });
+      if(claimed.count!==1)throw new BadRequestException("This password reset link is invalid or expired");
+      await tx.user.update({where:{id:reset.userId},data:{passwordHash}});
+      await tx.session.deleteMany({where:{userId:reset.userId}});
+    });
+    return {ok:true};
   }
 
-  async changePassword(userId: string, payload: unknown) {
-    const input = changePasswordSchema.parse(payload);
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
+  async changePassword(userId:string,currentSessionId:string,payload:unknown) {
+    const input=changePasswordSchema.parse(payload);
+    const user=await this.prisma.user.findUniqueOrThrow({where:{id:userId}});
+    if(!(await verifyPassword(input.currentPassword,user.passwordHash))) {
       throw new UnauthorizedException("Current password is incorrect");
     }
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: await hashPassword(input.newPassword) },
+    const nextHash=await hashPassword(input.newPassword);
+    await this.prisma.$transaction(async tx=>{
+      const changed=await tx.user.updateMany({
+        where:{id:userId,passwordHash:user.passwordHash},
+        data:{passwordHash:nextHash},
+      });
+      if(changed.count!==1)throw new ConflictException("Password was changed by another session");
+      await tx.session.deleteMany({
+        where:{userId,id:{not:currentSessionId}},
+      });
     });
-    return { ok: true };
+    return {ok:true};
   }
 }

@@ -319,3 +319,21 @@ tbody tr:hover { background:#fbfcfa; }
   .auth-panel { padding:32px 20px; }
   .auth-story { padding:36px 24px; }
 }
+
+.market-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.listing-card{overflow:hidden}
+.listing-art{min-height:150px;background:linear-gradient(120deg,var(--green-dark),var(--green));color:var(--lime);padding:26px;display:flex;align-items:flex-end;justify-content:space-between}
+.listing-art span{color:#edf5ec;font-size:12px;font-weight:700}
+.deal-tabs{display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:-8px 0 26px;padding-bottom:14px}
+.deal-tabs a{padding:10px 14px;border-radius:8px;font-size:13px;font-weight:680;color:var(--ink-soft);border:1px solid var(--line)}
+.deal-tabs a:hover{background:var(--green-soft);color:var(--green-dark)}
+.upload-target{display:grid;place-items:center;gap:12px;padding:30px;border:2px dashed var(--line);background:var(--surface-soft);border-radius:12px;cursor:pointer;text-align:center}
+.upload-target:hover{border-color:var(--green)}
+@media(max-width:1000px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){.market-grid{grid-template-columns:1fr}}
+
+@media(max-width:720px){
+  .public-header{padding-inline:16px;gap:10px}
+  .public-actions>.muted{display:none}
+  .public-actions .button{padding-inline:10px}
+}

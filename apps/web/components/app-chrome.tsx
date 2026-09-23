@@ -13,6 +13,9 @@ const workspaceRoots = [
   "/escrow",
   "/kyc",
   "/account",
+  "/my-listings",
+  "/wallet",
+  "/reviews",
 ];
 
 export function AppChrome({ children }: { children: React.ReactNode }) {

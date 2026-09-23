@@ -20,7 +20,7 @@ export const transitionDealSchema = z.object({
 
 export const fundEscrowSchema = z.object({
   amountMinor: z.string().regex(/^\d+$/),
-  provider: z.enum(["PAYSTACK", "WIRE"]),
+  provider: z.literal("SANDBOX"),
 });
 
 export const registerSchema = z.object({
@@ -51,6 +51,62 @@ export const changePasswordSchema = z.object({
 
 export const signOffSchema = z.object({
   party: z.enum(["BUYER", "SELLER"]),
+});
+
+export const createListingSchema = z.object({
+  name: z.string().trim().min(3).max(120),
+  category: z.string().trim().min(2).max(80),
+  askingPriceNaira: z.number().int().min(10000).max(10000000000),
+  annualRevenueNaira: z.number().int().nonnegative().max(10000000000),
+  recurringRevenuePct: z.number().int().min(0).max(100),
+  customerConcentration: z.number().int().min(0).max(100),
+  revenueTrendPct: z.number().int().min(-100).max(500),
+  ownerHoursPerWeek: z.number().int().min(0).max(168),
+  ipAssigned: z.boolean(),
+  litigationOpen: z.boolean(),
+});
+
+export const dataRoomUploadSchema = z.object({
+  listingId: z.string().uuid(),
+  name: z.string().trim().min(2).max(150),
+  category: z.enum(["Financial","Customers","Legal","Technical","Operations"]),
+  contentType: z.enum(["application/pdf","image/png","image/jpeg","text/csv"]),
+  dataBase64: z.string().min(12).max(5_600_000),
+});
+
+export const evidenceUploadSchema = z.object({
+  category: z.enum(["IDENTITY", "BUSINESS", "REVENUE"]),
+  documentType: z.enum([
+    "NIN_SLIP", "BVN_CONFIRMATION", "DRIVERS_LICENSE", "VOTERS_CARD",
+    "CAC_CERTIFICATE", "OWNERSHIP_PROOF", "ADDRESS_EVIDENCE",
+    "BANK_STATEMENT", "PROFIT_LOSS",
+  ]),
+  fileName: z.string().min(1).max(150),
+  contentType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+  dataBase64: z.string().min(12).max(5_600_000),
+});
+
+export const verificationReviewSchema = z.object({
+  category: z.enum(["IDENTITY", "BUSINESS", "REVENUE"]),
+  approve: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const buyerDiligenceQuestionSchema = z.object({
+  question: z.string().trim().min(10).max(1000),
+});
+
+export const sellerDiligenceAnswerSchema = z.object({
+  answer: z.string().trim().min(3).max(2000),
+});
+
+export const submitOfferSchema = z.object({
+  amountNaira: z.number().int().min(10000).max(10000000000),
+  message: z.string().trim().max(2000).optional(),
+});
+
+export const walletTopupSchema = z.object({
+  amountNaira: z.number().int().min(1000).max(10000000000),
 });
 
 export type DealStage = z.infer<typeof dealStageSchema>;

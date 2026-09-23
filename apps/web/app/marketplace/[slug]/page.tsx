@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, FileLock2, ShieldCheck, TrendingUp } from "lucide-react";
-import { money, optionalCurrentUser, publicApi } from "../../../lib/api";
+import { api, money, optionalCurrentUser, publicApi } from "../../../lib/api";
 import { PublicFooter, PublicHeader } from "../../../components/public-header";
 import { StartDealButton } from "../../../components/start-deal-button";
 
@@ -24,6 +24,7 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
     optionalCurrentUser(),
   ]);
 
+  const verification = user?.role==="BUYER" ? await api<{identityVerified:boolean}>("/kyc/me") : null;
   const next = encodeURIComponent(`/marketplace/${listing.slug}`);
 
   return (
@@ -37,10 +38,11 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
         <div className="page-head">
           <div>
             <h1>{listing.name}</h1>
-            <p>{listing.category} / Verified Nigerian digital business</p>
+            <p>{listing.category} / Nigerian digital business</p>
           </div>
           {user?.role === "BUYER" ? (
-            <StartDealButton slug={listing.slug}/>
+            verification?.identityVerified?<StartDealButton slug={listing.slug}/>:
+              <Link className="button" href="/kyc/identity">Complete sample identity verification</Link>
           ) : user ? (
             <Link href="/dashboard" className="button">Open your workspace</Link>
           ) : (
@@ -75,7 +77,7 @@ export default async function ListingPage({ params }: { params: Promise<{ slug: 
               <div className="list-row"><span className="muted">Business</span><strong>{listing.organization.name}</strong></div>
               <div className="list-row"><span className="muted">Revenue concentration</span><strong>{listing.customerConcentration}% largest customer</strong></div>
               <div className="list-row"><span className="muted">Confidential records</span><strong>NDA required</strong></div>
-              <div className="list-row"><span className="muted">Settlement</span><strong>Protected escrow</strong></div>
+              <div className="list-row"><span className="muted">Settlement</span><strong>Simulated escrow</strong></div>
             </div>
           </section>
         </div>

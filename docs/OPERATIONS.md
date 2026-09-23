@@ -20,6 +20,14 @@ A reasonable first production target for the transaction application:
 - horizontal scaling for dynamic routes
 - immutable static assets cached aggressively
 
+For `output: "standalone"` releases, Next.js does not copy its generated
+browser assets into the standalone folder. Include `apps/web/.next/static`
+as `.next/static` alongside the deployed `server.js`, and include
+`apps/web/public` as `public` when it exists. Otherwise HTML renders but
+registration, dialogs, form submissions and all other hydrated interactions
+can remain non-functional. CI tests a served JavaScript bundle and runs
+Chromium against the production standalone server.
+
 ### API
 
 - two or more NestJS replicas behind a load balancer

@@ -12,6 +12,9 @@ import {
   LedgerDirection,
   User,
   UserRole,
+  WalletDirection,
+  WalletTxType,
+  ListingStatus,
 } from "@prisma/client";
 import { fundEscrowSchema, signOffSchema } from "@dealos/contracts";
 import { randomUUID } from "node:crypto";
@@ -35,10 +38,52 @@ export class EscrowService {
     });
     if (!deal || !deal.escrow) throw new NotFoundException("Escrow account not found");
     const participant = deal.participants.some((p) => p.userId === actor.id);
-    if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role) && !participant) {
+    if (actor.role !== UserRole.ADMIN && !participant) {
       throw new ForbiddenException("You do not have access to this escrow");
     }
     return deal;
+  }
+
+  async create(dealId:string,actor:User){
+    if(actor.role!==UserRole.ADVISOR&&actor.role!==UserRole.ADMIN){
+      throw new ForbiddenException("An advisor opens escrow after the sale agreement");
+    }
+    const deal=await this.prisma.deal.findUnique({
+      where:{id:dealId},
+      include:{participants:true,offer:true,listing:{include:{verification:true}}},
+    });
+    if(!deal||(!deal.participants.some(p=>p.userId===actor.id)&&actor.role!==UserRole.ADMIN)){
+      throw new NotFoundException("Acquisition not found");
+    }
+    if(deal.stage!==DealStage.SPA||deal.offer?.status!=="ACCEPTED"||!deal.agreedPriceMinor){
+      throw new ConflictException("Escrow opens after an accepted offer and closing agreement");
+    }
+    if(!deal.listing.verification?.businessVerified||!deal.listing.verification.revenueVerified){
+      throw new ForbiddenException("The business must pass its own verification");
+    }
+    const parties=deal.participants.filter(p=>p.role===UserRole.BUYER||p.role===UserRole.SELLER);
+    if(parties.length!==2)throw new ConflictException("Buyer and seller are required");
+    const identity=await this.prisma.kycCase.findMany({where:{userId:{in:parties.map(p=>p.userId)}}});
+    if(identity.length!==2||identity.some(k=>!k.identityVerified)){
+      throw new ForbiddenException("Both participants must complete personal verification");
+    }
+    return serialize(await this.prisma.$transaction(async tx=>{
+      // Serialize duplicate advisor requests and reuse the existing account.
+      await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "id" = ${dealId} FOR UPDATE`;
+      const prior=await tx.escrowAccount.findUnique({where:{dealId}});
+      if(prior)return prior;
+      const escrow=await tx.escrowAccount.create({data:{
+        dealId,amountMinor:deal.agreedPriceMinor!,currency:"NGN",status:EscrowStatus.CREATED,
+      }});
+      const correlationId=randomUUID();
+      await this.audit.create({dealId,actor,resourceType:"ESCROW",resourceId:escrow.id,
+        action:"ESCROW_CREATED",nextState:EscrowStatus.CREATED,
+        metadata:{amountMinor:escrow.amountMinor.toString()},correlationId},tx);
+      await tx.outboxEvent.create({data:{
+        topic:"escrow.created",aggregateId:dealId,payload:{dealId,escrowId:escrow.id,correlationId},
+      }});
+      return escrow;
+    }));
   }
 
   async get(dealId: string, actor: User) {
@@ -61,12 +106,17 @@ export class EscrowService {
     const scope = `escrow:fund:${dealId}`;
     const correlationId = randomUUID();
     const context = await this.dealContext(dealId, actor);
+    if (context.buyerId !== actor.id) throw new ForbiddenException("Only this deal's buyer can fund escrow");
+    if (process.env.DEALOS_DEMO_FINANCE_ENABLED !== "true") throw new ForbiddenException("Simulated funding is disabled");
+    const kyc = await this.prisma.kycCase.findUnique({where:{userId:actor.id}});
+    if (!kyc?.identityVerified) throw new ForbiddenException("Complete demo identity verification first");
 
     if (!([DealStage.ESCROW, DealStage.ASSET_TRANSFER] as DealStage[]).includes(context.stage)) {
       throw new ConflictException("Deal must be in escrow before funding");
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "EscrowAccount" WHERE "dealId" = ${dealId} FOR UPDATE`;
       const existing = await tx.idempotencyRecord.findUnique({
         where: { scope_key: { scope, key: idempotencyKey } },
       });
@@ -86,6 +136,23 @@ export class EscrowService {
         throw new ConflictException("Funding amount must match the agreed escrow amount");
       }
 
+      const claimed=await tx.escrowAccount.updateMany({
+        where:{id:escrow.id,status:escrow.status},
+        data:{status:EscrowStatus.FUNDED},
+      });
+      if(claimed.count!==1) throw new ConflictException("Escrow was funded by another request");
+      const wallet=await tx.walletAccount.findUnique({where:{userId:actor.id}});
+      if(!wallet) throw new ConflictException("Create and fund your demo wallet first");
+      const debited=await tx.walletAccount.updateMany({
+        where:{id:wallet.id,balanceMinor:{gte:escrow.amountMinor}},
+        data:{balanceMinor:{decrement:escrow.amountMinor}},
+      });
+      if(debited.count!==1) throw new ConflictException("Insufficient demo wallet balance");
+      await tx.walletTransaction.create({data:{
+        walletId:wallet.id,dealId,direction:WalletDirection.DEBIT,
+        type:WalletTxType.ESCROW_FUNDING,amountMinor:escrow.amountMinor,
+        idempotencyKey:`escrow-fund:${dealId}`,
+      }});
       await tx.idempotencyRecord.create({ data: { scope, key: idempotencyKey, requestHash } });
       const transaction = await tx.escrowTransaction.create({
         data: {
@@ -122,10 +189,6 @@ export class EscrowService {
         ],
       });
 
-      await tx.escrowAccount.update({
-        where: { id: escrow.id },
-        data: { status: EscrowStatus.FUNDED },
-      });
       await tx.idempotencyRecord.update({
         where: { scope_key: { scope, key: idempotencyKey } },
         data: { resultId: transaction.id },
@@ -156,68 +219,76 @@ export class EscrowService {
   async signOff(dealId: string, actor: User, payload: unknown) {
     const input = signOffSchema.parse(payload);
     const context = await this.dealContext(dealId, actor);
+    if (context.stage !== DealStage.ASSET_TRANSFER) {
+      throw new ConflictException("Asset transfer must be underway before sign-off");
+    }
     const expectedRole = input.party === "BUYER" ? UserRole.BUYER : UserRole.SELLER;
-    if (actor.role !== expectedRole) throw new ForbiddenException(`Only the ${input.party.toLowerCase()} can sign this confirmation`);
-    if (!([EscrowStatus.FUNDED, EscrowStatus.TRANSFER_IN_PROGRESS, EscrowStatus.VERIFICATION, EscrowStatus.RELEASE_PENDING] as EscrowStatus[]).includes(context.escrow!.status)) {
-      throw new ConflictException("Escrow is not ready for completion sign-off");
+    if (actor.role !== expectedRole) {
+      throw new ForbiddenException("Only the relevant party can confirm this transfer");
     }
 
-    const correlationId = randomUUID();
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async tx => {
+      // Lock the escrow row so simultaneous buyer and seller sign-offs never overwrite each other.
+      await tx.$queryRaw`SELECT "id" FROM "EscrowAccount" WHERE "dealId" = ${dealId} FOR UPDATE`;
       const escrow = await tx.escrowAccount.findUniqueOrThrow({ where: { dealId } });
+      if (!([EscrowStatus.FUNDED, EscrowStatus.VERIFICATION, EscrowStatus.RELEASE_PENDING] as EscrowStatus[]).includes(escrow.status)) {
+        throw new ConflictException("Escrow cannot accept completion sign-off in its current state");
+      }
+      if (escrow.disputedAt) throw new ConflictException("Resolve the escrow dispute before sign-off");
+      const items = await tx.assetTransferItem.findMany({ where: { dealId } });
+      if (!items.length || items.some(item => !item.buyerDone || !item.sellerDone)) {
+        throw new ConflictException("Both parties must complete every asset transfer item first");
+      }
+      if (input.party === "BUYER" && escrow.buyerSignedOffAt) return;
+      if (input.party === "SELLER" && escrow.sellerSignedOffAt) return;
+
       const now = new Date();
       const buyerSignedOffAt = input.party === "BUYER" ? now : escrow.buyerSignedOffAt;
       const sellerSignedOffAt = input.party === "SELLER" ? now : escrow.sellerSignedOffAt;
       const nextStatus = buyerSignedOffAt && sellerSignedOffAt
-        ? EscrowStatus.RELEASE_PENDING
-        : EscrowStatus.VERIFICATION;
-
+        ? EscrowStatus.RELEASE_PENDING : EscrowStatus.VERIFICATION;
       await tx.escrowAccount.update({
         where: { id: escrow.id },
-        data: {
-          buyerSignedOffAt,
-          sellerSignedOffAt,
-          status: nextStatus,
-        },
+        data: { buyerSignedOffAt, sellerSignedOffAt, status: nextStatus },
       });
       await this.audit.create({
-        dealId,
-        actor,
-        resourceType: "ESCROW",
-        resourceId: escrow.id,
-        action: "COMPLETION_SIGNED",
-        previousState: escrow.status,
-        nextState: nextStatus,
-        metadata: { party: input.party },
-        correlationId,
+        dealId, actor, resourceType: "ESCROW", resourceId: escrow.id,
+        action: "COMPLETION_SIGNED", previousState: escrow.status, nextState: nextStatus,
+        metadata: { party: input.party }, correlationId: randomUUID(),
       }, tx);
     });
-
     return this.get(dealId, actor);
   }
 
   async platformConfirm(dealId: string, actor: User) {
-    if (!([UserRole.ADVISOR, UserRole.ADMIN] as UserRole[]).includes(actor.role)) {
-      throw new ForbiddenException("Platform confirmation requires an advisor");
+    if (actor.role !== UserRole.ADVISOR && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Advisor confirmation required");
     }
     const context = await this.dealContext(dealId, actor);
-    if (!context.escrow!.buyerSignedOffAt || !context.escrow!.sellerSignedOffAt) {
-      throw new ConflictException("Both parties must sign before platform confirmation");
+    if (context.stage !== DealStage.ASSET_TRANSFER) {
+      throw new ConflictException("Deal is not awaiting completion");
     }
-    const correlationId = randomUUID();
-    await this.prisma.$transaction(async (tx) => {
-      const escrow = await tx.escrowAccount.update({
-        where: { dealId },
-        data: { platformConfirmedAt: new Date(), status: EscrowStatus.RELEASE_PENDING },
+    await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "EscrowAccount" WHERE "dealId" = ${dealId} FOR UPDATE`;
+      const escrow = await tx.escrowAccount.findUniqueOrThrow({ where: { dealId } });
+      if (escrow.status !== EscrowStatus.RELEASE_PENDING || escrow.disputedAt) {
+        throw new ConflictException("Escrow is not awaiting advisor confirmation");
+      }
+      if (!escrow.buyerSignedOffAt || !escrow.sellerSignedOffAt) {
+        throw new ConflictException("Both parties must sign off first");
+      }
+      if (escrow.platformConfirmedAt) return;
+      const items = await tx.assetTransferItem.findMany({ where: { dealId } });
+      if (!items.length || items.some(item => !item.buyerDone || !item.sellerDone)) {
+        throw new ConflictException("Asset transfer is incomplete");
+      }
+      await tx.escrowAccount.update({
+        where: { id: escrow.id }, data: { platformConfirmedAt: new Date() },
       });
       await this.audit.create({
-        dealId,
-        actor,
-        resourceType: "ESCROW",
-        resourceId: escrow.id,
-        action: "PLATFORM_RELEASE_CONFIRMED",
-        nextState: EscrowStatus.RELEASE_PENDING,
-        correlationId,
+        dealId, actor, resourceType: "ESCROW", resourceId: escrow.id,
+        action: "PLATFORM_RELEASE_CONFIRMED", nextState: EscrowStatus.RELEASE_PENDING,
+        correlationId: randomUUID(),
       }, tx);
     });
     return this.get(dealId, actor);
@@ -234,6 +305,7 @@ export class EscrowService {
     await this.dealContext(dealId, actor);
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "EscrowAccount" WHERE "dealId" = ${dealId} FOR UPDATE`;
       const existing = await tx.idempotencyRecord.findUnique({
         where: { scope_key: { scope, key: idempotencyKey } },
       });
@@ -246,7 +318,18 @@ export class EscrowService {
       const escrow = await tx.escrowAccount.findUniqueOrThrow({ where: { dealId } });
       const blocker = escrowReleaseBlocker(escrow);
       if (blocker) throw new ConflictException(blocker);
-
+      const deal=await tx.deal.findUniqueOrThrow({where:{id:dealId},include:{participants:true}});
+      const assets=await tx.assetTransferItem.findMany({where:{dealId}});
+      if(deal.stage!==DealStage.ASSET_TRANSFER || !assets.length || assets.some(a=>!a.buyerDone || !a.sellerDone)) {
+        throw new ConflictException("Asset transfer must be confirmed before release");
+      }
+      const seller=deal.participants.find(p=>p.role===UserRole.SELLER);
+      if(!seller) throw new ConflictException("Seller not found");
+      const claimed=await tx.escrowAccount.updateMany({
+        where:{id:escrow.id,status:EscrowStatus.RELEASE_PENDING},
+        data:{status:EscrowStatus.RELEASED},
+      });
+      if(claimed.count!==1) throw new ConflictException("Escrow release is already in progress");
       await tx.idempotencyRecord.create({ data: { scope, key: idempotencyKey, requestHash } });
       const transaction = await tx.escrowTransaction.create({
         data: {
@@ -281,7 +364,14 @@ export class EscrowService {
           },
         ],
       });
-      await tx.escrowAccount.update({ where: { id: escrow.id }, data: { status: EscrowStatus.RELEASED } });
+      await tx.walletAccount.createMany({data:[{userId:seller.userId}],skipDuplicates:true});
+      const sellerWallet=await tx.walletAccount.findUniqueOrThrow({where:{userId:seller.userId}});
+      await tx.walletAccount.update({where:{id:sellerWallet.id},data:{balanceMinor:{increment:escrow.amountMinor}}});
+      await tx.walletTransaction.create({data:{
+        walletId:sellerWallet.id,dealId,direction:WalletDirection.CREDIT,type:WalletTxType.ESCROW_RELEASE,
+        amountMinor:escrow.amountMinor,idempotencyKey:`escrow-release:${dealId}`,
+      }});
+      await tx.listing.update({where:{id:deal.listingId},data:{status:ListingStatus.SOLD}});
       await tx.deal.update({ where: { id: dealId }, data: { stage: DealStage.COMPLETED, version: { increment: 1 } } });
       await tx.idempotencyRecord.update({ where: { scope_key: { scope, key: idempotencyKey } }, data: { resultId: transaction.id } });
       await this.audit.create({

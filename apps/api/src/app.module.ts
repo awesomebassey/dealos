@@ -8,8 +8,12 @@ import { DataRoomModule } from "./data-room/data-room.module";
 import { DiligenceModule } from "./diligence/diligence.module";
 import { EscrowModule } from "./escrow/escrow.module";
 import { KycModule } from "./kyc/kyc.module";
+import { WalletModule } from "./wallet/wallet.module";
+import { OffersModule } from "./offers/offers.module";
+import { ListingVerificationModule } from "./listing-verification/listing-verification.module";
 import { ListingsModule } from "./listings/listings.module";
 import { OutboxWorker } from "./common/outbox.worker";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   providers: [OutboxWorker],
@@ -24,6 +28,10 @@ import { OutboxWorker } from "./common/outbox.worker";
     EscrowModule,
     KycModule,
     ListingsModule,
+    ListingVerificationModule,
+    OffersModule,
+    WalletModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -17,10 +17,10 @@ const steps = [
 ] as const;
 
 const features = [
-  [BadgeCheck, "Verified participants", "Identity and business checks establish who is on each side of the transaction before sensitive access is granted."],
+  [BadgeCheck, "Demo-reviewed participants", "The sandbox reviewer examines fictional identity and business samples before confidential access is granted."],
   [FileLock2, "Protected data rooms", "Confidential documents stay behind signed NDA access with every document event recorded."],
   [SearchCheck, "Structured due diligence", "Financial, customer, legal and technical risks stay organised with clear questions for the seller."],
-  [Landmark, "Protected settlement", "Escrow funding, asset confirmation and release controls keep the closing process deliberate and auditable."],
+  [Landmark, "Protected settlement", "Simulated escrow funding, asset confirmation and release keep each step visible and auditable."],
 ] as const;
 
 export default function Home() {
@@ -32,7 +32,7 @@ export default function Home() {
           <div className="hero-copy">
             <h1>Buy or sell a Nigerian digital business with confidence.</h1>
             <p>
-              DealOS brings verification, confidential documents, due diligence,
+              DealOS brings demonstration verification, confidential documents, due diligence,
               deal progress and protected settlement into one clear acquisition journey.
             </p>
             <div className="hero-actions">
@@ -41,10 +41,10 @@ export default function Home() {
             </div>
           </div>
           <div className="hero-trust">
-            <div className="trust-item"><BadgeCheck size={20}/><div><strong>Verified accounts</strong><span>Buyer and seller identity checks</span></div></div>
+            <div className="trust-item"><BadgeCheck size={20}/><div><strong>Demo-reviewed accounts</strong><span>Illustrative buyer and seller evidence reviews</span></div></div>
             <div className="trust-item"><FileLock2 size={20}/><div><strong>NDA protected</strong><span>Controlled access to confidential files</span></div></div>
             <div className="trust-item"><Handshake size={20}/><div><strong>Guided transactions</strong><span>A clear path from interest to closing</span></div></div>
-            <div className="trust-item"><ShieldCheck size={20}/><div><strong>Protected escrow</strong><span>Funds move only after agreed conditions</span></div></div>
+            <div className="trust-item"><ShieldCheck size={20}/><div><strong>Simulated escrow</strong><span>Demo funds move after both parties confirm</span></div></div>
           </div>
         </div>
       </section>

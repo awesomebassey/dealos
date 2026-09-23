@@ -13,7 +13,7 @@ export default async function DealPage({params}:{params:Promise<{id:string}>}){
  const {id}=await params;const [user,deal]=await Promise.all([currentUser(),api<Deal>(`/deals/${id}`)]);
  return <>
   <div className="page-head"><div><h1>{deal.listing.name}</h1><p>{deal.ref} / {deal.listing.category}</p></div>
-    <DealActions dealId={id} stage={deal.stage} version={deal.version} userRole={user.role}/></div>
+    <DealActions dealId={id} stage={deal.stage} version={deal.version} userRole={user.role} hasEscrow={!!deal.escrow} escrowStatus={deal.escrow?.status}/></div>
   <section className="card"><div className="section-head"><h2 className="section-title">Acquisition progress</h2><span className="status active">{sentence(deal.stage)}</span></div>
     <Pipeline stage={deal.stage}/></section>
   <div className="grid stats" style={{marginTop:16}}>

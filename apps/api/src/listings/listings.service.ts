@@ -40,7 +40,7 @@ export class ListingsService {
     return serialize(await this.prisma.listing.findMany({
       where:{ organizationId:actor.organizationId },
       orderBy:{createdAt:"desc"},
-      select:{id:true,slug:true,name:true,category:true,status:true,askingPriceMinor:true,annualRevenueMinor:true,createdAt:true},
+      select:{id:true,slug:true,name:true,category:true,status:true,askingPriceMinor:true,annualRevenueMinor:true,createdAt:true,verification:{select:{status:true,businessVerified:true,revenueVerified:true}}},
       take:100,
     }));
   }
@@ -73,6 +73,7 @@ export class ListingsService {
         recurringRevenuePct:data.recurringRevenuePct,customerConcentration:data.customerConcentration,
         revenueTrendPct:data.revenueTrendPct,ownerHoursPerWeek:data.ownerHoursPerWeek,
         ipAssigned:data.ipAssigned,litigationOpen:data.litigationOpen,currency:"NGN",
+        verification:{create:{status:"PENDING"}},
       }});
       await tx.auditEvent.create({data:{actorId:actor.id,resourceType:"LISTING",resourceId:listing.id,action:"LISTING_CREATED",metadata:{name:listing.name},correlationId:randomUUID()}});
       return listing;
@@ -85,8 +86,12 @@ export class ListingsService {
     if (!listing) throw new NotFoundException("Listing not found");
     if (listing.organizationId!==actor.organizationId) throw new ForbiddenException("This is not your business");
     const kyc=await this.prisma.kycCase.findUnique({where:{userId:actor.id}});
-    if (!kyc?.identityVerified || !kyc.businessVerified || !kyc.revenueVerified) {
-      throw new ForbiddenException("Complete identity, business and revenue verification before publishing");
+    if (!kyc?.identityVerified) {
+      throw new ForbiddenException("Complete personal verification before publishing");
+    }
+    const verification=await this.prisma.listingVerification.findUnique({where:{listingId:listing.id}});
+    if(!verification?.businessVerified || !verification.revenueVerified){
+      throw new ForbiddenException("Complete this business's registration and revenue reviews before publishing");
     }
     if (!(listing.status === ListingStatus.DRAFT || listing.status === ListingStatus.ARCHIVED)) {
       throw new ConflictException("Only draft or archived listings can be published");

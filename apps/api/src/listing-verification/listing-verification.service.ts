@@ -112,10 +112,14 @@ export class ListingVerificationService {
     const listing=await this.listing(slug,actor);
     const category:Section=input.category;
     return serialize(await this.prisma.$transaction(async tx=>{
-      const row=await tx.listingVerification.findUniqueOrThrow({
-        where:{listingId:listing.id},include:{evidence:true},
+      const record=await tx.listingVerification.findUniqueOrThrow({
+        where:{listingId:listing.id},select:{id:true},
       });
-      await tx.$queryRaw`SELECT "id" FROM "ListingVerification" WHERE "id"=${row.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT "id" FROM "ListingVerification" WHERE "id"=${record.id} FOR UPDATE`;
+      const row=await tx.listingVerification.findUniqueOrThrow({
+        where:{id:record.id},
+        include:{evidence:{select:{id:true,category:true,status:true,documentType:true}}},
+      });
       const pending=row.evidence.filter(e=>e.category===category&&e.status===EvidenceStatus.SUBMITTED);
       if(!pending.length)throw new BadRequestException("No samples awaiting review in this section");
       if(input.approve){
@@ -130,10 +134,16 @@ export class ListingVerificationService {
           throw new BadRequestException("Submit all required documents for this business");
         }
       }
-      await tx.listingEvidence.updateMany({where:{id:{in:pending.map(e=>e.id)}},data:{
-        status:input.approve?EvidenceStatus.APPROVED:EvidenceStatus.REJECTED,
-        reviewedById:actor.id,reviewedAt:new Date(),reviewNote:input.note||null,
-      }});
+      const claimed=await tx.listingEvidence.updateMany({
+        where:{id:{in:pending.map(e=>e.id)},status:EvidenceStatus.SUBMITTED},
+        data:{
+          status:input.approve?EvidenceStatus.APPROVED:EvidenceStatus.REJECTED,
+          reviewedById:actor.id,reviewedAt:new Date(),reviewNote:input.note||null,
+        },
+      });
+      if(claimed.count!==pending.length){
+        throw new BadRequestException("One of these documents was already reviewed");
+      }
       const businessVerified=category==="BUSINESS"?input.approve:row.businessVerified;
       const revenueVerified=category==="REVENUE"?input.approve:row.revenueVerified;
       const updated=await tx.listingVerification.update({where:{id:row.id},data:{

@@ -92,16 +92,19 @@ class BrowserPage {
   }
   async button(label,at=0){
     await this.activate();
-    // Wait until Next.js attaches the React event handler to this button.
     const match="(()=>{const list=[...document.querySelectorAll('button')].filter(el=>el.textContent.trim()==="+
       jsString(label)+" && el.getBoundingClientRect().width>0);const el=list["+at+"];"+
       "if(!el)return null;el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();"+
+      "const x=r.left+r.width/2,y=r.top+r.height/2;const hit=document.elementFromPoint(x,y);"+
       "return {hydrated:Object.keys(el).some(key=>key.startsWith('__reactProps')),"+
-      "x:r.left+r.width/2,y:r.top+r.height/2}})()";
+      "enabled:!el.disabled,hittable:el.contains(hit),hit:hit?.tagName,x,y}})()";
+    let last=null;
     const pos=await until(async()=>{
-      const result=await this.eval(match);
-      return result?.hydrated ? result : null;
-    },"hydrated button "+label,20000);
+      last=await this.eval(match);
+      return last?.hydrated && last?.enabled && last?.hittable ? last : null;
+    },"clickable button "+label,20000).catch(error=>{
+      throw new Error(error.message+"; last hit-test: "+JSON.stringify(last));
+    });
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:pos.x,y:pos.y});
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});

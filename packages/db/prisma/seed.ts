@@ -9,8 +9,7 @@ import {
   FindingSeverity,
 } from "@prisma/client";
 import { config } from "dotenv";
-import { resolve, join } from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { randomBytes, scrypt } from "node:crypto";
 
@@ -78,6 +77,8 @@ async function main() {
   await prisma.passwordResetToken.deleteMany();
   await prisma.session.deleteMany();
   await prisma.kycCase.deleteMany();
+  await prisma.listingEvidence.deleteMany();
+  await prisma.listingVerification.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
@@ -153,6 +154,7 @@ async function main() {
       name: "KoraMetrics",
       slug: "korametrics",
       status: "PUBLISHED",
+      verification:{create:{status:KycStatus.VERIFIED,businessVerified:true,revenueVerified:true,reviewedAt:new Date()}},
       category: "SaaS / Analytics",
       country: "Nigeria",
       askingPriceMinor: 65000000000n,
@@ -204,13 +206,10 @@ async function main() {
     },
   });
 
-  const sampleRoot=resolve(process.env.DEALOS_PRIVATE_DOCUMENT_DIR || "../../.private/data-room");
   async function sampleDocument(listingId:string,category:string,name:string) {
-    const storageKey=`${listingId}/${randomUUID()}`;
-    const content=Buffer.from(`SIMULATED SAMPLE DATA ONLY\\nBusiness: ${listingId}\\nDocument: ${name}\\nNo real personal or financial information.\\n`);
-    await mkdir(join(sampleRoot,listingId),{recursive:true,mode:0o700});
-    await writeFile(join(sampleRoot,...storageKey.split("/")),content,{mode:0o600,flag:"wx"});
-    return {listingId,name,category,objectKey:storageKey,contentType:"text/csv",sizeBytes:content.length};
+    const content=Buffer.from(`SAMPLE DATA ONLY\\nBusiness: ${listingId}\\nDocument: ${name}\\nIllustrative transaction records.\\n`);
+    return {listingId,name,category,objectKey:`${listingId}/${randomUUID()}`,
+      contentType:"text/csv",sizeBytes:content.length,contentBytes:content};
   }
   await prisma.dataRoomDocument.createMany({data:[
     await sampleDocument(ids.listing,"Financial","Illustrative revenue.csv"),
@@ -318,6 +317,7 @@ async function main() {
     const listing=await prisma.listing.create({data:{
       id:listingId,organizationId:orgId,name,slug:`sample-business-${serial}`,
       status:"PUBLISHED",category:categories[(i-1)%categories.length],country:"Nigeria",
+      verification:{create:{status:KycStatus.VERIFIED,businessVerified:true,revenueVerified:true,reviewedAt:new Date()}},
       askingPriceMinor:BigInt(35_000_000+i*1_250_000)*100n,currency:"NGN",
       annualRevenueMinor:BigInt(12_000_000+i*325_000)*100n,
       recurringRevenuePct:40+i%55,customerConcentration:12+i%35,

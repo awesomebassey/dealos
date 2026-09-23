@@ -29,10 +29,9 @@ export function SellerDocumentUpload({listingId}:{listingId:string}){
   }
   return <form className="card card-pad form" onSubmit={submit}>
     <h2 className="section-title">Add a confidential sample document</h2>
-    <div className="warning-panel">Use fabricated sample records only. Do not upload real customer, identity, financial or corporate documents to this prototype.</div>
     <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.csv" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0]||null;setFile(f);if(f)setName(f.name);}}/>
     <button className="upload-target" type="button" onClick={()=>fileRef.current?.click()}>
-      <FileUp size={25}/>{file?file.name:"Choose a sample document"}<span className="muted">PDF, PNG, JPEG or CSV under 4MB</span>
+      <FileUp size={25}/>{file?file.name:"Choose a sample document"}<span className="muted">PDF, PNG, JPEG or CSV samples under 4MB</span>
     </button>
     <div className="field"><label htmlFor="doc-name">Document name</label><input id="doc-name" className="input" value={name} onChange={e=>setName(e.target.value)} minLength={2} required/></div>
     <div className="field"><label>Document category</label><Select.Root value={category} onValueChange={setCategory}>

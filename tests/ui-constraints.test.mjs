@@ -19,6 +19,7 @@ test("product UI avoids prohibited presentation markers", () => {
   assert.doesNotMatch(source, /—/u);
   assert.doesNotMatch(source, /·/u);
   assert.doesNotMatch(source, /eyebrow/i);
+  assert.doesNotMatch(source, /warning-panel/i);
   assert.doesNotMatch(source, /developer note/i);
   assert.doesNotMatch(source, /founder note/i);
   assert.doesNotMatch(source, /<select\b/);

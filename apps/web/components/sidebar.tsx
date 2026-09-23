@@ -24,6 +24,5 @@ export function Sidebar(){
   <Link className="wordmark" href="/dashboard"><span className="wordmark-mark">D</span><span>DealOS</span></Link>
   <nav className="nav" aria-label="Workspace navigation">
   {items.map(([href,label,Icon])=><Link key={href} href={href} className={path===href||path.startsWith(`${href}/`)?"active":""}><Icon size={17}/><span>{label}</span></Link>)}</nav>
-  <div className="sidebar-foot">Independent acquisition marketplace prototype.</div>
  </aside>;
 }

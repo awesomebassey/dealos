@@ -47,13 +47,32 @@ async function until(callback,label,timeout=16000){
 }
 function jsString(value){return JSON.stringify(value);}
 class BrowserPage {
-  constructor(target,session){this.target=target;this.cdp=session;}
+  constructor(target,session){
+    this.target=target;this.cdp=session;
+  }
+  async activate(){
+    // Chrome opens three isolated tabs. Real input events must target the
+    // active tab rather than the background tab left behind by target creation.
+    await this.cdp.send("Page.bringToFront");
+  }
+  async hydration(selector){
+    await until(()=>this.eval(
+      "(()=>{const el=document.querySelector("+jsString(selector)+");return !!el && Object.keys(el).some(key=>key.startsWith('__reactProps$'))})()"
+    ),"React hydration for "+selector,20000);
+  }
+  async diagnostic(){
+    return this.eval("(()=>({path:location.pathname,ready:document.readyState,body:document.body.innerText.slice(-1000),"+
+      "form:[...document.querySelectorAll('form')].map(f=>({action:f.action,buttons:[...f.querySelectorAll('button')].map(b=>"+
+      "({label:b.textContent.trim(),disabled:b.disabled,hydrated:Object.keys(b).some(k=>k.startsWith('__reactProps$'))})),inputs:"+
+      "[...f.querySelectorAll('input')].map(i=>({name:i.name,filled:!!i.value,valid:i.validity.valid}))}))}))()");
+  }
   async eval(expression){
     const result=await this.cdp.send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
     if(result.exceptionDetails)throw new Error(result.exceptionDetails.text);
     return result.result.value;
   }
   async goto(path){
+    await this.activate();
     await this.cdp.send("Page.navigate",{url:origin+path});
     await until(()=>this.eval("document.readyState === 'complete' && location.pathname === "+jsString(new URL(origin+path).pathname)),"navigate "+path);
     await wait(350);
@@ -62,6 +81,7 @@ class BrowserPage {
     return this.eval("(()=>{const matches=[...document.querySelectorAll('button')].filter(el=>el.textContent.trim()==="+jsString(label)+" && el.getBoundingClientRect().width>0);return matches.length})()");
   }
   async click(selector,at=0){
+    await this.activate();
     const pos=await this.eval("(()=>{const items=[...document.querySelectorAll("+jsString(selector)+")].filter(el=>el.getBoundingClientRect().width>0 && el.getBoundingClientRect().height>0);const node=items["+at+"];if(!node)return null;node.scrollIntoView({block:'center'});const r=node.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
     if(!pos)throw new Error("Browser control not found: "+selector+" index "+at);
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:pos.x,y:pos.y});
@@ -69,7 +89,7 @@ class BrowserPage {
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
   }
   async button(label,at=0){
-    const selector="button";
+    await this.activate();
     const pos=await this.eval("(()=>{const list=[...document.querySelectorAll('button')].filter(el=>el.textContent.trim()==="+jsString(label)+"&&el.getBoundingClientRect().width>0);const el=list["+at+"];if(!el)return null;el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
     if(!pos)throw new Error("Button not found: "+label+" ("+at+")");
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:pos.x,y:pos.y});
@@ -77,6 +97,7 @@ class BrowserPage {
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});
   }
   async fill(selector,value){
+    await this.activate();
     const found=await this.eval("(()=>{const el=document.querySelector("+jsString(selector)+");if(!el)return false;el.focus();el.select();return true})()");
     if(!found)throw new Error("Input not found: "+selector);
     await this.cdp.send("Input.insertText",{text:value});
@@ -102,10 +123,18 @@ async function newPage(browser,debuggerOrigin){
 }
 async function signIn(page,email,password){
   await page.goto("/login");
+  // Wait for React's event handlers before interacting with controlled forms.
+  // Input or button clicks against server markup can otherwise be lost.
+  await page.hydration('form button');
   await page.fill("#login-email",email);
   await page.fill("#login-password",password);
   await page.button("Sign in");
-  await until(()=>page.eval("location.pathname === '/dashboard'"),"first-party sign-in");
+  try{
+    await until(()=>page.eval("location.pathname === '/dashboard'"),"first-party sign-in",22000);
+  }catch(error){
+    const diagnostics=await page.diagnostic().catch(e=>({error:e.message}));
+    throw new Error(error.message+"; page state: "+JSON.stringify(diagnostics));
+  }
 }
 export async function runNativeBrowserSmoke(){
   const chrome=[process.env.CHROME_PATH,"/usr/bin/google-chrome","/usr/bin/google-chrome-stable",

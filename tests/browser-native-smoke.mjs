@@ -139,7 +139,7 @@ export async function runNativeBrowserSmoke(){
     await until(()=>buyer.textIncludes("Amara"),"Buyer dashboard");
     await buyer.goto("/marketplace/sample-business-004");
     await buyer.button("Start acquisition");
-    await until(()=>buyer.eval(/^/.source?"/^\\/deals\\/[a-f0-9-]+$/.test(location.pathname)":""),"buyer deal navigation");
+    await until(()=>buyer.eval("location.pathname.startsWith('/deals/') && location.pathname.split('/').length===3"),"buyer deal navigation");
     const dealId=(await buyer.eval("location.pathname")).split("/")[2];
     assert.ok(dealId);
     await buyer.button("Review and sign sample NDA");

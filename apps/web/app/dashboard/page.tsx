@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, Handshake, Landmark, SearchCheck, Store } from "lucide-react";
 import { api, currentUser, type Deal, money, sentence } from "../../lib/api";
 
-type MyListing={id:string;slug:string;name:string;status:string;askingPriceMinor:string};
+type MyListing={id:string;slug:string;name:string;status:string;askingPriceMinor:string;verification?:{businessVerified:boolean;revenueVerified:boolean}|null};
 type Verification={identityVerified:boolean;businessVerified:boolean;revenueVerified:boolean;status:string};
 
 export default async function Dashboard() {
@@ -16,7 +16,7 @@ export default async function Dashboard() {
   const priority=active.flatMap(d=>d.findings||[]).filter(f=>["HIGH","CRITICAL"].includes(f.severity)).length;
   const funded=active.filter(d=>["FUNDED","VERIFICATION","RELEASE_PENDING"].includes(d.escrow?.status||"")).length;
   const totalValue=active.reduce((sum,d)=>sum+BigInt(d.agreedPriceMinor||"0"),0n);
-  const sellerReady=!!verification?.identityVerified&&!!verification?.businessVerified&&!!verification?.revenueVerified;
+  const sellerReady=!!verification?.identityVerified;
   const buyerReady=!!verification?.identityVerified;
   const needsVerification=(user.role==="SELLER"&&!sellerReady)||(user.role==="BUYER"&&!buyerReady);
   const greeting=`Welcome back, ${user.name.split(" ")[0]}`;
@@ -35,10 +35,11 @@ export default async function Dashboard() {
       </div>
       <Link className="button" href={action.href}>{action.label} <ArrowRight size={15}/></Link>
     </div>
-    {needsVerification&&<div className="warning-panel" style={{marginBottom:20}}>
-      {user.role==="SELLER"?"Complete demo personal, business and revenue verification before publishing your business.":"Complete demo identity verification to start acquiring a business."}
-      <Link className="text-link" href="/kyc" style={{marginLeft:10}}>Continue verification</Link>
-    </div>}
+    {needsVerification&&<section className="card card-pad" style={{marginBottom:20}}>
+      <h2 className="section-title">Complete your personal verification</h2>
+      <p className="muted">Your account needs an approved identity review before acquiring or publishing businesses.</p>
+      <Link className="button secondary" href="/kyc/identity">Continue verification</Link>
+    </section>}
     <div className="grid stats">
       <div className="card card-pad"><div className="kpi"><span className="kpi-icon"><Handshake size={19}/></span>
         <div><div className="stat-label">Active acquisitions</div><div className="stat-value">{active.length}</div></div></div>

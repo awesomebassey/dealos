@@ -49,10 +49,21 @@ async function approveListing(advisor,slug,category,until){
   for(const e of record.verification.evidence.filter(e=>e.category===category&&e.status==="SUBMITTED")){
     await inspect(advisor,"/listing-verification/"+slug+"/evidence/"+e.id+"/sample");
   }
+  const reviewPath="/api/listing-verification/"+slug+"/review";
+  const previous=await advisor.eval("window.__dealosRequests.filter(r=>r.path==="+JSON.stringify(reviewPath)+" && r.method==='POST').length");
   await advisor.button("Approve documents");
   await advisor.button("Confirm review");
-  const flag=category==="BUSINESS"?"businessVerified":"revenueVerified";
-  await apiUntil(advisor,"/listing-verification/"+slug,r=>r.verification[flag],until,"approval "+category);
+  try{
+    const request=await until(()=>advisor.eval("window.__dealosRequests.filter(r=>r.path==="+JSON.stringify(reviewPath)+" && r.method==='POST')["+previous+"]"),"business review HTTP request "+category,5000);
+    if(request.status>=400)throw new Error("Reviewer API rejected "+category+": "+JSON.stringify(request));
+    const flag=category==="BUSINESS"?"businessVerified":"revenueVerified";
+    await apiUntil(advisor,"/listing-verification/"+slug,r=>r.verification[flag],until,"approval "+category);
+  }catch(error){
+    const details=await advisor.diagnostic().catch(e=>({diagnosticError:e.message}));
+    throw new Error("Business approval failed: "+error.message+"; "+JSON.stringify({
+      path:details.path,body:details.body?.slice(-450),requests:details.requests
+    }));
+  }
 }
 async function postStage(advisor,dealId,label,stage,until){
   await advisor.goto("/deals/"+dealId);
@@ -227,7 +238,10 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
   }catch(error){
     for(const [role,page] of [["buyer",buyer],["seller",seller],["advisor",reviewer]]){
       const diagnostics=await page.diagnostic().catch(e=>({error:e.message}));
-      console.error("Complete browser journey "+step+" / "+role+": "+JSON.stringify(diagnostics).slice(0,1500));
+      console.error("Complete browser journey "+step+" / "+role+": "+JSON.stringify({
+        path:diagnostics.path,body:diagnostics.body?.slice(-850),
+        requests:diagnostics.requests?.slice(-15),forms:diagnostics.form,
+      }).slice(0,6000));
     }
     throw error;
   }finally{

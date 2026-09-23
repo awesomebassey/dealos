@@ -1,13 +1,21 @@
 import Link from "next/link";
 import { api,currentUser,money,sentence } from "../../../../lib/api";
 import { EscrowActions } from "../../../../components/escrow-actions";
-type Deal={id:string;stage:string;listing:{name:string};escrow?:{status:string;amountMinor:string}|null;assetItems:Array<{buyerDone:boolean;sellerDone:boolean}>};
+import { CreateEscrowButton } from "../../../../components/create-escrow-button";
+type Deal={id:string;stage:string;offer?:{status:string}|null;listing:{name:string};escrow?:{status:string;amountMinor:string}|null;assetItems:Array<{buyerDone:boolean;sellerDone:boolean}>};
 type Escrow={status:string;amountMinor:string;buyerSignedOffAt?:string|null;sellerSignedOffAt?:string|null;platformConfirmedAt?:string|null;
  transactions:Array<{id:string;type:string;status:string;amountMinor:string;createdAt:string}>;};
 type Wallet={balanceMinor:string};
 export default async function DealEscrow({params}:{params:Promise<{id:string}>}){
  const {id}=await params;const [user,deal]=await Promise.all([currentUser(),api<Deal>(`/deals/${id}`)]);
- if(!deal.escrow)return <div className="card empty"><h3>Escrow opens after an accepted offer</h3><p>The seller must approve a buyer offer before a separate demo escrow account is created for this acquisition.</p><Link href={`/deals/${id}`} className="button">View transaction</Link></div>;
+ if(!deal.escrow)return <div className="card empty">
+   <h3>{deal.offer?.status==="ACCEPTED"?"Ready to open escrow":"An accepted offer starts escrow"}</h3>
+   <p>{deal.offer?.status==="ACCEPTED"?
+     "The transaction advisor can create a separate escrow account after the closing agreement is prepared.":
+     "The buyer and seller must agree on the purchase price before escrow can be opened."}</p>
+   {["ADVISOR","ADMIN"].includes(user.role)&&deal.stage==="SPA"&&deal.offer?.status==="ACCEPTED"?
+     <CreateEscrowButton dealId={id}/>:<Link href={`/deals/${id}`} className="button">View transaction</Link>}
+  </div>;
  const [escrow,wallet]=await Promise.all([
    api<Escrow>(`/escrow/deals/${id}`),
    user.role==="BUYER"?api<Wallet>("/wallet"):Promise.resolve(null),
@@ -18,7 +26,7 @@ export default async function DealEscrow({params}:{params:Promise<{id:string}>})
     <EscrowActions dealId={id} dealStage={deal.stage} userRole={user.role} status={escrow.status} amountMinor={escrow.amountMinor}
       buyerSigned={!!escrow.buyerSignedOffAt} sellerSigned={!!escrow.sellerSignedOffAt}
       platformConfirmed={!!escrow.platformConfirmedAt} assetsComplete={complete}/></div>
-  <div className="warning-panel" style={{marginBottom:20}}>No funds are transferred, held or paid out. All wallet and escrow balances in DealOS are simulated.</div>
+  {["ADVISOR","ADMIN"].includes(user.role)&&deal.stage==="SPA"&&<div className="card card-pad" style={{marginBottom:20}}><h2 className="section-title">Escrow created</h2><p className="muted">Approve the next acquisition stage before the buyer funds this account.</p><Link className="button secondary" href={`/deals/${id}`}>Continue transaction</Link></div>}
   <div className="grid three">
     <div className="card card-pad"><div className="stat-label">Agreed purchase price</div><div className="stat-value">{money(escrow.amountMinor)}</div></div>
     <div className="card card-pad"><div className="stat-label">Escrow status</div><div className="stat-value" style={{fontSize:24}}>{sentence(escrow.status)}</div></div>

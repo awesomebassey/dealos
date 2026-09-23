@@ -44,7 +44,7 @@ export class KycService {
   async queue(actor:User) {
     if(!(actor.role === UserRole.ADVISOR || actor.role === UserRole.ADMIN)) throw new ForbiddenException("Reviewer account required");
     return serialize(await this.prisma.kycCase.findMany({
-      where:{evidence:{some:{status:EvidenceStatus.SUBMITTED}}},
+      where:{evidence:{some:{status:EvidenceStatus.SUBMITTED,category:EvidenceCategory.IDENTITY}}},
       include:{user:{select:{id:true,name:true,email:true,role:true}},evidence:{select:{category:true,status:true,documentType:true}}},
       orderBy:{updatedAt:"asc"},take:100,
     }));
@@ -52,8 +52,9 @@ export class KycService {
 
   async submit(actor:User,body:unknown) {
     if(actor.role!==UserRole.BUYER && actor.role!==UserRole.SELLER) throw new ForbiddenException("Verification applies to buyers and sellers");
-    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED!=="true") throw new ForbiddenException("Demo uploads are disabled. Use synthetic evidence in a local sandbox.");
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED==="false") throw new ForbiddenException("Sample uploads are unavailable");
     const input=evidenceUploadSchema.parse(body);
+    if(input.category!==EvidenceCategory.IDENTITY) throw new BadRequestException("Business and revenue evidence must be submitted under a specific business");
     if(!kinds[input.category].includes(input.documentType)) throw new BadRequestException("Document type does not match evidence category");
     const bytes=Buffer.from(input.dataBase64,"base64");
     if(bytes.length<12 || bytes.length>4_000_000 || !looksLike(bytes,input.contentType)) {
@@ -61,11 +62,7 @@ export class KycService {
     }
     const fileName=input.fileName.replace(/[^a-zA-Z0-9._ -]/g,"_").slice(0,120);
     const key=`${actor.id}/${randomUUID()}`;
-    const filePath=join(storageDir,...key.split("/"));
-    await mkdir(join(storageDir,actor.id),{recursive:true,mode:0o700});
-    await writeFile(filePath,bytes,{flag:"wx",mode:0o600});
-    try {
-      const result=await this.prisma.$transaction(async tx=>{
+    const result=await this.prisma.$transaction(async tx=>{
         const item=await tx.kycCase.upsert({where:{userId:actor.id},
           create:{userId:actor.id,country:"Nigeria",status:KycStatus.IN_REVIEW},
           update:{
@@ -77,17 +74,16 @@ export class KycService {
         });
         const evidence=await tx.verificationEvidence.create({data:{
           caseId:item.id,category:input.category,documentType:input.documentType,
-          fileName,contentType:input.contentType,fileSize:bytes.length,storageKey:key,
+          fileName,contentType:input.contentType,fileSize:bytes.length,storageKey:key,contentBytes:bytes,
         }});
         await tx.auditEvent.create({data:{actorId:actor.id,resourceType:"KYC_EVIDENCE",resourceId:evidence.id,action:"DEMO_EVIDENCE_SUBMITTED",metadata:{category:input.category,documentType:input.documentType},correlationId:randomUUID()}});
         return evidence;
       });
-      return serialize({id:result.id,category:result.category,status:result.status,fileName:result.fileName});
-    } catch(error){ await rm(filePath,{force:true}); throw error; }
+    return serialize({id:result.id,category:result.category,status:result.status,fileName:result.fileName});
   }
 
   async sample(evidenceId:string,actor:User) {
-    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED!=="true"){
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED==="false"){
       throw new ForbiddenException("Synthetic evidence previews are disabled");
     }
     const evidence=await this.prisma.verificationEvidence.findUnique({
@@ -103,8 +99,12 @@ export class KycService {
       throw new NotFoundException("Sample not found");
     }
     let bytes:Buffer;
-    try {bytes=await readFile(join(storageDir,owner,fileId));}
-    catch {throw new NotFoundException("Sample file is unavailable");}
+    if(evidence.contentBytes){
+      bytes=Buffer.from(evidence.contentBytes);
+    }else{
+      try {bytes=await readFile(join(storageDir,owner,fileId));}
+      catch {throw new NotFoundException("Sample file is unavailable");}
+    }
     await this.prisma.auditEvent.create({data:{
       actorId:actor.id,resourceType:"KYC_EVIDENCE",resourceId:evidenceId,
       action:"DEMO_EVIDENCE_VIEWED",
@@ -117,6 +117,7 @@ export class KycService {
   async review(userId:string,actor:User,payload:unknown) {
     if(!(actor.role === UserRole.ADVISOR || actor.role === UserRole.ADMIN)) throw new ForbiddenException("Reviewer account required");
     const input=verificationReviewSchema.parse(payload);
+    if(input.category!==EvidenceCategory.IDENTITY) throw new BadRequestException("Review business evidence under its own listing");
     return this.prisma.$transaction(async tx=>{
       const item=await tx.kycCase.findUnique({where:{userId},include:{user:true,evidence:true}});
       if(!item) throw new NotFoundException("Verification case not found");
@@ -150,7 +151,7 @@ export class KycService {
         businessVerified:input.category==="BUSINESS"?input.approve:item.businessVerified,
         revenueVerified:input.category==="REVENUE"?input.approve:item.revenueVerified,
       };
-      const done=item.user.role===UserRole.SELLER ? Object.values(flags).every(Boolean) : flags.identityVerified;
+      const done=flags.identityVerified;
       const updated=await tx.kycCase.update({where:{id:item.id},data:{
         ...flags,status:!input.approve?KycStatus.NEEDS_INFORMATION:done?KycStatus.VERIFIED:KycStatus.IN_REVIEW,
         reviewedAt:new Date(),

@@ -229,9 +229,9 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
     await reviewer.button("Create escrow",1);
     await apiUntil(reviewer,"/deals/"+dealId,r=>r.escrow?.status==="CREATED",until,"explicit advisor escrow creation");
     await postStage(reviewer,dealId,"escrow","ESCROW",until);
-    step="demo wallet and escrow funding";
+    step="wallet and escrow funding";
     await buyer.goto("/wallet");
-    await buyer.button("Add simulated funds");
+    await buyer.button("Add funds");
     await buyer.fill("#demo-amount","1900000");
     await buyer.button("Credit demo balance");
     await apiUntil(buyer,"/wallet",w=>w.balanceMinor==="190000000",until,"buyer top-up");

@@ -25,7 +25,7 @@ const titles: Record<string, string> = {
   "/kyc": "Verification",
   "/account": "Account",
   "/my-listings": "My businesses",
-  "/wallet": "Demo wallet",
+  "/wallet": "Wallet",
   "/reviews": "Review queue",
 };
 

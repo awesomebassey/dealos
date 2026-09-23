@@ -7,7 +7,7 @@ type Wallet={id:string;balanceMinor:string;transactions:Array<{
 export default async function Wallet(){
  const [user,wallet]=await Promise.all([currentUser(),api<Wallet>("/wallet")]);
  return <>
-  <div className="page-head"><div><h1>Demo wallet</h1><p>Illustrative funding and acquisition payouts in Naira.</p></div>
+  <div className="page-head"><div><h1>Wallet</h1><p>Illustrative funding and acquisition payouts in Naira.</p></div>
     {user.role==="BUYER"&&<DemoTopup/>}</div>
   <div className="card card-pad" style={{maxWidth:650,marginBottom:20,background:"var(--green-dark)",color:"#fff"}}>
     <div style={{fontSize:14,color:"#d2ddd7"}}>Available demo balance</div>

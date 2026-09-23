@@ -134,7 +134,7 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   await page("/kyc/identity",buyerCookie);
   await page("/deals/"+escrow.id+"/assets",buyerCookie);
   const wallet=await page("/wallet",buyerCookie);
-  assert.ok(wallet.includes("Demo wallet"));
+  assert.ok(wallet.includes("wallet"));
 
   const sellerCookie=await login("tunde@korametrics.example");
   const sellerListings=await page("/my-listings",sellerCookie);

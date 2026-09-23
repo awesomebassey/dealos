@@ -228,14 +228,14 @@ export async function runNativeBrowserSmoke(){
     const walletBefore=await buyer.fetch("/wallet");
     assert.equal(walletBefore.status,200);
     await buyer.goto("/wallet");
-    await buyer.button("Add simulated funds");
+    await buyer.button("Add funds");
     await until(()=>buyer.eval("document.querySelector('#demo-amount')!==null"),"Demo top-up form");
     await buyer.fill("#demo-amount","150000");
     await buyer.button("Credit demo balance");
     await until(async()=>{
       const state=await buyer.fetch("/wallet");
       return BigInt(state.body.balanceMinor)>=BigInt(walletBefore.body.balanceMinor)+15000000n;
-    },"Demo wallet credited");
+    },"wallet credited");
     await signIn(seller,"tunde@korametrics.example",password);
     await seller.goto("/my-listings");
     assert.ok(await seller.textIncludes("KoraMetrics"),"Seller listings missing");

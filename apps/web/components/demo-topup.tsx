@@ -19,7 +19,7 @@ export function DemoTopup(){
   finally{setBusy(false);}
  }
  return <Dialog.Root open={open} onOpenChange={setOpen}>
-  <Dialog.Trigger asChild><button className="button">Add simulated funds</button></Dialog.Trigger>
+  <Dialog.Trigger asChild><button className="button">Add funds</button></Dialog.Trigger>
   <Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="dialog-content">
     <Dialog.Title asChild><h2>Add to your demo balance</h2></Dialog.Title>
     <Dialog.Description>Choose an illustrative amount in Naira. No bank account, payment provider or actual money is used.</Dialog.Description>

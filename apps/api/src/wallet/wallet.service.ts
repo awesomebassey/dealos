@@ -30,7 +30,7 @@ export class WalletService {
         data:[{userId:actor.id}],skipDuplicates:true,
       });
       const wallet=await tx.walletAccount.findUniqueOrThrow({where:{userId:actor.id}});
-      // Serialize updates to one demo wallet. Two requests with the same key share the first result.
+      // Serialize updates to one wallet. Two requests with the same key share the first result.
       await tx.$queryRaw`SELECT "id" FROM "WalletAccount" WHERE "id" = ${wallet.id} FOR UPDATE`;
       const prior=await tx.walletTransaction.findUnique({where:{walletId_idempotencyKey:{walletId:wallet.id,idempotencyKey}}});
       if(prior){

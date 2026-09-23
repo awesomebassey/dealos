@@ -142,12 +142,12 @@ export class EscrowService {
       });
       if(claimed.count!==1) throw new ConflictException("Escrow was funded by another request");
       const wallet=await tx.walletAccount.findUnique({where:{userId:actor.id}});
-      if(!wallet) throw new ConflictException("Create and fund your demo wallet first");
+      if(!wallet) throw new ConflictException("Create and fund your wallet first");
       const debited=await tx.walletAccount.updateMany({
         where:{id:wallet.id,balanceMinor:{gte:escrow.amountMinor}},
         data:{balanceMinor:{decrement:escrow.amountMinor}},
       });
-      if(debited.count!==1) throw new ConflictException("Insufficient demo wallet balance");
+      if(debited.count!==1) throw new ConflictException("Insufficient wallet balance");
       await tx.walletTransaction.create({data:{
         walletId:wallet.id,dealId,direction:WalletDirection.DEBIT,
         type:WalletTxType.ESCROW_FUNDING,amountMinor:escrow.amountMinor,

@@ -1,7 +1,7 @@
 # DealOS: multi-business transaction design
 
 ## Product journey
-Buyer: register -> submit identity evidence -> review (sandbox advisor) -> browse paginated published listings -> open an acquisition -> sign the deal NDA -> view that deal's documents -> raise diligence questions -> submit an offer -> seller accepts -> advisor reviews diligence and closing agreement -> advisor explicitly creates a deal-specific escrow account -> fund demo wallet -> fund deal escrow -> confirm transferred assets -> dual sign-off -> advisor releases simulated funds.
+Buyer: register -> submit identity evidence -> review (sandbox advisor) -> browse paginated published listings -> open an acquisition -> sign the deal NDA -> view that deal's documents -> raise diligence questions -> submit an offer -> seller accepts -> advisor reviews diligence and closing agreement -> advisor explicitly creates a deal-specific escrow account -> fund wallet -> fund deal escrow -> confirm transferred assets -> dual sign-off -> advisor releases simulated funds.
 
 Seller: register -> submit personal identity sample -> create separate listing drafts -> submit each listing's own business and revenue evidence -> advisor approves each listing independently -> upload confidential listing sample documents -> publish one or more businesses -> review offers by deal -> accept one offer -> prepare asset transfer -> sign off -> see simulated seller wallet credited.
 

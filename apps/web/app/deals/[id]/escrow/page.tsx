@@ -31,15 +31,15 @@ export default async function DealEscrow({params}:{params:Promise<{id:string}>})
   <div className="grid three">
     <div className="card card-pad"><div className="stat-label">Agreed purchase price</div><div className="stat-value">{money(escrow.amountMinor)}</div></div>
     <div className="card card-pad"><div className="stat-label">Escrow status</div><div className="stat-value" style={{fontSize:24}}>{sentence(escrow.status)}</div></div>
-    {wallet?<div className="card card-pad"><div className="stat-label">Your demo wallet</div><div className="stat-value">{money(wallet.balanceMinor)}</div>
-      <Link className="text-link" href="/wallet">Add simulated funds</Link></div>:<div className="card card-pad"><div className="stat-label">Transfer checklist</div><div className="stat-value">{complete?"Complete":"Pending"}</div>
+    {wallet?<div className="card card-pad"><div className="stat-label">Your wallet</div><div className="stat-value">{money(wallet.balanceMinor)}</div>
+      <Link className="text-link" href="/wallet">Add funds</Link></div>:<div className="card card-pad"><div className="stat-label">Transfer checklist</div><div className="stat-value">{complete?"Complete":"Pending"}</div>
       <Link className="text-link" href={`/deals/${id}/assets`}>View assets</Link></div>}
   </div>
   <section className="card card-pad" style={{marginTop:18}}>
     <h2 className="section-title">Funds movement</h2>
     <div className="grid three" style={{marginTop:17}}>
       <div className="card card-pad">
-        <div className="stat-label">Buyer demo wallet</div>
+        <div className="stat-label">Buyer wallet</div>
         <div className="stat-value" style={{fontSize:22}}>{escrow.transactions.some(t=>t.type==="FUND"&&t.status==="SETTLED")?"Debited":"Awaiting funding"}</div>
         <div className="stat-foot">{escrow.transactions.some(t=>t.type==="FUND"&&t.status==="SETTLED")?money(escrow.amountMinor)+" moved to escrow":"No debit recorded"}</div>
       </div>
@@ -49,7 +49,7 @@ export default async function DealEscrow({params}:{params:Promise<{id:string}>})
         <div className="stat-foot">{escrow.status==="RELEASED"?"The escrow account has been settled":escrow.status==="CREATED"?"Buyer funding is the next step":money(escrow.amountMinor)+" allocated to this acquisition"}</div>
       </div>
       <div className="card card-pad">
-        <div className="stat-label">Seller demo wallet</div>
+        <div className="stat-label">Seller wallet</div>
         <div className="stat-value" style={{fontSize:22}}>{escrow.status==="RELEASED"?"Credited":"Awaiting release"}</div>
         <div className="stat-foot">{escrow.status==="RELEASED"?money(escrow.amountMinor)+" credited once":"Both parties must finish the handover"}</div>
       </div>

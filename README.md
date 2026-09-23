@@ -25,7 +25,7 @@ npm run db:generate
 npm run db:deploy
 ```
 
-The example env file enables synthetic evidence uploads, private sample documents and demo wallet activity for local testing. It disables destructive seeding by default. To load **10 independent businesses** into a disposable development database:
+The example env file enables synthetic evidence uploads, private sample documents and wallet activity for local testing. It disables destructive seeding by default. To load **10 independent businesses** into a disposable development database:
 
 ```bash
 DEALOS_ALLOW_DESTRUCTIVE_SEED=true DEALOS_SEED_LISTING_COUNT=10 npm run db:seed

@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import {runNativeBrowserSmoke} from "./browser-native-smoke.mjs";
 
 const root=fileURLToPath(new URL("../",import.meta.url));
 const apiCwd=join(root,"apps/api");
@@ -133,4 +134,7 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   const withoutSession=await fetch(webOrigin+"/dashboard",{redirect:"manual"});
   assert.ok([302,303,307,308].includes(withoutSession.status),
     "Unauthenticated workspace route must redirect");
+  await t.test("real Chromium browser validates buyer, seller, advisor and mobile",async()=>{
+    await runNativeBrowserSmoke();
+  });
 });

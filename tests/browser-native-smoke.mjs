@@ -57,13 +57,13 @@ class BrowserPage {
   }
   async hydration(selector){
     await until(()=>this.eval(
-      "(()=>{const el=document.querySelector("+jsString(selector)+");return !!el && Object.keys(el).some(key=>key.startsWith('__reactProps$'))})()"
+      "(()=>{const el=document.querySelector("+jsString(selector)+");return !!el && Object.keys(el).some(key=>key.startsWith('__reactProps'))})()"
     ),"React hydration for "+selector,20000);
   }
   async diagnostic(){
     return this.eval("(()=>({path:location.pathname,ready:document.readyState,body:document.body.innerText.slice(-1000),"+
       "form:[...document.querySelectorAll('form')].map(f=>({action:f.action,buttons:[...f.querySelectorAll('button')].map(b=>"+
-      "({label:b.textContent.trim(),disabled:b.disabled,hydrated:Object.keys(b).some(k=>k.startsWith('__reactProps$'))})),inputs:"+
+      "({label:b.textContent.trim(),disabled:b.disabled,hydrated:Object.keys(b).some(k=>k.startsWith('__reactProps'))})),inputs:"+
       "[...f.querySelectorAll('input')].map(i=>({name:i.name,filled:!!i.value,valid:i.validity.valid}))}))}))()");
   }
   async eval(expression){
@@ -90,12 +90,16 @@ class BrowserPage {
   }
   async button(label,at=0){
     await this.activate();
-    // A Next.js page can finish loading before its client components hydrate.
-    // Do not discard real clicks against markup with no event handlers yet.
-    await until(()=>this.eval("(()=>{const matches=[...document.querySelectorAll('button')].filter(el=>"+
-      "el.textContent.trim()==="+jsString(label)+" && el.getBoundingClientRect().width>0);"+
-      "const button=matches["+at+"];return !!button && Object.keys(button).some(key=>key.startsWith('__reactProps("(()=>{const list=[...document.querySelectorAll('button')].filter(el=>el.textContent.trim()==="+jsString(label)+"&&el.getBoundingClientRect().width>0);const el=list["+at+"];if(!el)return null;el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()");
-    if(!pos)throw new Error("Button not found: "+label+" ("+at+")");
+    // Wait until Next.js attaches the React event handler to this button.
+    const match="(()=>{const list=[...document.querySelectorAll('button')].filter(el=>el.textContent.trim()==="+
+      jsString(label)+" && el.getBoundingClientRect().width>0);const el=list["+at+"];"+
+      "if(!el)return null;el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();"+
+      "return {hydrated:Object.keys(el).some(key=>key.startsWith('__reactProps')),"+
+      "x:r.left+r.width/2,y:r.top+r.height/2}})()";
+    const pos=await until(async()=>{
+      const result=await this.eval(match);
+      return result?.hydrated ? result : null;
+    },"hydrated button "+label,20000);
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:pos.x,y:pos.y});
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mousePressed",x:pos.x,y:pos.y,button:"left",clickCount:1});
     await this.cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:pos.x,y:pos.y,button:"left",clickCount:1});

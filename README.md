@@ -2,6 +2,8 @@
 
 DealOS is an independent, Nigeria-first digital-business acquisition marketplace prototype. It is not affiliated with Africa Acquisition. It demonstrates first-party authentication, seller onboarding, a multi-business marketplace, NDA-controlled document rooms, diligence, offers, simulated Naira wallets and escrow, asset transfer and deal settlement.
 
+Sandbox uploads and simulated funding are **disabled unless explicitly enabled** with `DEALOS_DEMO_VERIFICATION_ENABLED=true`, `DEALOS_DEMO_DOCUMENTS_ENABLED=true` and `DEALOS_DEMO_FINANCE_ENABLED=true`. The sample local environment enables them for a disposable database. For public deployments, leave them disabled unless the demonstration is intentionally isolated and accepts only fabricated sample files.
+
 **Demonstration only.** Verification decisions use synthetic documents. Wallet balances and escrow transactions are simulated. Do not upload real NIN, BVN, identity, customer or banking documents or treat demo balances as real funds.
 
 ## Technology

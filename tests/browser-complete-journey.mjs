@@ -144,7 +144,7 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
     await seller.fill("#ownerHoursPerWeek","15");
     await seller.click('[role="checkbox"]');
     await seller.button("Create business draft");
-    await until(()=>seller.eval("location.pathname.startsWith('/my-listings/') && location.pathname.split('/').length===3"),"seller listing creation",20000);
+    await until(()=>seller.eval("location.pathname.startsWith('/my-listings/') && location.pathname!=='/my-listings/new' && location.pathname.split('/').length===3"),"seller listing creation",20000);
     const slug=(await seller.eval("location.pathname")).split("/")[2];
     const listing=(await seller.fetch("/listings/mine")).body.find(l=>l.slug===slug);
     assert.equal(listing.name,name);

@@ -35,7 +35,13 @@ async function approveIdentity(advisor,userId,evidenceId,until){
   await inspect(advisor,"/kyc/evidence/"+evidenceId+"/sample");
   await advisor.button("Approve demo evidence");
   await advisor.button("Confirm demo review");
-  await apiUntil(advisor,"/kyc/"+userId,r=>r.identityVerified,until,"identity approval");
+  try {
+    await until(() => advisor.eval("window.__dealosRequests?.some(r=>r.path==="+JSON.stringify("/api/kyc/"+userId+"/review")+" && r.method==='POST')"),"identity review HTTP request",5000);
+    await apiUntil(advisor,"/kyc/"+userId,r=>r.identityVerified,until,"identity approval");
+  } catch(error) {
+    const details=await advisor.diagnostic().catch(e=>({diagnosticError:e.message}));
+    throw new Error("Identity approval failed: "+error.message+"; "+JSON.stringify(details));
+  }
 }
 async function approveListing(advisor,slug,category,until){
   await advisor.goto("/reviews/businesses/"+slug);

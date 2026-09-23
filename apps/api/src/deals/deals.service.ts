@@ -76,6 +76,10 @@ export class DealsService {
     const correlationId = randomUUID();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Serialize concurrent NDA submissions for the same deal. A replay after
+      // the first commit returns the signed agreement without duplicate state,
+      // audit events or notifications.
+      await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "id" = ${id} FOR UPDATE`;
       const deal = await tx.deal.findUnique({ where: { id } });
       if (!deal) throw new NotFoundException("Deal not found");
       if (deal.stage !== DealStage.NDA_PENDING) {

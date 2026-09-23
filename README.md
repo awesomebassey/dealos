@@ -64,11 +64,11 @@ Replace the example email. This one-time command refuses to run if a reviewer or
 ## End-to-end product journey
 
 1. **Create accounts.** Register separate buyer and seller accounts. Log in as the reviewer when their demonstration evidence is ready.
-2. **Review identity.** The buyer submits one fabricated sample resembling an accepted identity document. A seller submits fabricated identity, business ownership/registration/address and revenue evidence. The reviewer opens each sample and records an explicit simulated approval.
-3. **List a business.** The verified seller creates a draft, uploads at least one synthetic financial document and publishes the business. The public marketplace supports search and 12-item pages, including a 100-listing test.
+2. **Review personal identity.** Buyers and sellers submit one synthetic identity sample under their account. The advisor opens the file and records a simulated approval. A new account is never automatically verified.
+3. **Verify each business.** A seller creates a draft listing. Every listing starts with its own pending registration and revenue reviews, even if the seller already has approved businesses. Under My businesses, upload synthetic CAC, ownership and business-address evidence, plus bank-statement and profit-and-loss samples. The advisor opens each file and approves each section. Add a financial sample to the listing's confidential room before publishing. The marketplace supports search and 12-item pages, tested with 100 businesses.
 4. **Start an acquisition.** The verified buyer opens a published listing and starts a transaction. Each buyer/listing combination has its own deal. The buyer reviews and signs the sample NDA before entering that deal's confidential data room.
-5. **Review and negotiate.** Diligence findings and seller questions are tied to the deal, and the seller can answer questions. The buyer submits a Naira offer. The seller accepts or declines. One accepted offer closes that listing to competing buyers and opens a dedicated escrow record.
-6. **Simulate closing.** The advisor advances the deal after the required checks. The buyer adds fabricated funds to a demo wallet and funds this deal's escrow. Buyer and seller confirm each handover item independently, sign off, and the advisor records the simulated release. The seller's demo wallet is credited exactly once.
+5. **Review and negotiate.** Diligence findings and seller questions are tied to each deal; sellers can answer them. The buyer submits a Naira offer. The seller accepts or declines. One accepted offer closes that listing to competing buyers and records the agreed amount.
+6. **Simulate closing.** The advisor advances the deal to the closing agreement, explicitly creates an escrow account for the accepted offer, then advances to escrow. The buyer adds demo funds to their wallet and funds this acquisition. Buyer and seller independently confirm every transfer item and sign off; the advisor confirms and releases simulated funds. The buyer's balance decreases on funding, and the seller's balance increases once on release. All actions are recorded as separate wallet and escrow ledger entries.
 
 The workspace has separate buyer, seller and reviewer navigation, and every Documents, Due Diligence and Escrow page asks the user to choose a deal rather than opening the first listing automatically.
 
@@ -76,6 +76,21 @@ The workspace has separate buyer, seller and reviewer navigation, and every Docu
 
 CI runs a clean `npm ci`, Prisma generation and migrations, one-time reviewer bootstrap checks, a **100-business** PostgreSQL seed, UI-source constraints, API tests, Next.js/NestJS production builds, the complete API acquisition smoke test and a web-route smoke test for public and authenticated pages. A real browser interaction and visual review remain separate from these automated checks.
 
-The bundled private-file implementation is intended for a **single-process sandbox** and does not constitute production-grade identity-document storage. A multi-replica deployment needs durable encrypted private object storage, malware scanning, access controls, retention and deletion policies. Production identity verification and actual money custody require their own regulated-provider integrations and operational controls. None are simulated as genuine external verifications or payouts.
+The sandbox now persists small synthetic PDF, PNG, JPEG and CSV uploads in private PostgreSQL byte fields, so a subsequent request is not dependent on the API instance that received the file. This is a demonstration storage strategy, not production-grade handling of real identity documents. A deployment accepting real sensitive documents needs durable encrypted private object storage, malware scanning, strict access controls, retention and deletion policies. Production identity verification and actual money custody require their own regulated-provider integrations and operational controls. None are simulated as genuine external verifications or payouts.
 
 See [Operations](docs/OPERATIONS.md) for scaling, incident handling and deployment considerations.
+
+### Verify the current branch
+
+Run the end-to-end acquisition tests with a disposable local PostgreSQL database and a fresh seed. These commands deliberately do not run against a shared or production database:
+
+```bash
+npm ci
+npm run db:generate
+npm run db:deploy
+DEALOS_ALLOW_DESTRUCTIVE_SEED=true DEALOS_SEED_LISTING_COUNT=100 npm run db:seed
+DEALOS_SMOKE_DEMO_PASSWORD="<your local demo fixture password>" npm run test:smoke
+npm run build
+```
+
+CI supplies the fixture password for its isolated ephemeral database. The full API test covers account registration, independent business review, confidential file access, two competing offers, manual escrow opening, idempotent wallet funding, asset transfer, and a single seller payout. The web test renders the public and authenticated Next.js routes against the actual API.

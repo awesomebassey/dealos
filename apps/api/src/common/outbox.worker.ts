@@ -10,6 +10,7 @@ class UnsupportedEvent extends Error {}
 const dealTitles:Record<string,string>={
   "deal.created":"A new acquisition has started",
   "deal.nda_signed":"Acquisition NDA signed",
+  "deal.withdrawn":"Another offer was accepted for this business",
   "deal.stage_changed":"Acquisition stage updated",
   "offer.submitted":"A buyer submitted an offer",
   "offer.accepted":"Your acquisition offer was accepted",

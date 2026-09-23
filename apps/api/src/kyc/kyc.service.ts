@@ -63,6 +63,14 @@ export class KycService {
     const fileName=input.fileName.replace(/[^a-zA-Z0-9._ -]/g,"_").slice(0,120);
     const key=`${actor.id}/${randomUUID()}`;
     const result=await this.prisma.$transaction(async tx=>{
+        if(actor.role===UserRole.SELLER && actor.organizationId){
+          // The seller's replacement identity evidence invalidates their
+          // account approval, so public listings are paused during re-review.
+          await tx.listing.updateMany({
+            where:{organizationId:actor.organizationId,status:"PUBLISHED"},
+            data:{status:"ARCHIVED"},
+          });
+        }
         const item=await tx.kycCase.upsert({where:{userId:actor.id},
           create:{userId:actor.id,country:"Nigeria",status:KycStatus.IN_REVIEW},
           update:{

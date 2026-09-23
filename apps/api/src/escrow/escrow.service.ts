@@ -68,6 +68,8 @@ export class EscrowService {
       throw new ForbiddenException("Both participants must complete personal verification");
     }
     return serialize(await this.prisma.$transaction(async tx=>{
+      // Serialize duplicate advisor requests and reuse the existing account.
+      await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "id" = ${dealId} FOR UPDATE`;
       const prior=await tx.escrowAccount.findUnique({where:{dealId}});
       if(prior)return prior;
       const escrow=await tx.escrowAccount.create({data:{

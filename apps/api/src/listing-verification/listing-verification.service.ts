@@ -1,5 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { EvidenceCategory, EvidenceStatus, KycStatus, User, UserRole } from "@prisma/client";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { EvidenceCategory, EvidenceStatus, KycStatus, ListingStatus, User, UserRole } from "@prisma/client";
 import { evidenceUploadSchema, verificationReviewSchema } from "@dealos/contracts";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -71,6 +71,15 @@ export class ListingVerificationService {
       throw new BadRequestException("Choose a PDF, PNG or JPEG sample under 2MB");
     }
     const result=await this.prisma.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${listing.id} FOR UPDATE`;
+      const current=await tx.listing.findUniqueOrThrow({where:{id:listing.id}});
+      if(current.status===ListingStatus.UNDER_OFFER || current.status===ListingStatus.SOLD){
+        throw new ConflictException("Evidence cannot change during an accepted acquisition");
+      }
+      if(current.status===ListingStatus.PUBLISHED){
+        // Replacement evidence pauses public exposure until independent re-review.
+        await tx.listing.update({where:{id:listing.id},data:{status:ListingStatus.ARCHIVED}});
+      }
       const verification=await tx.listingVerification.findUniqueOrThrow({where:{listingId:listing.id}});
       const evidence=await tx.listingEvidence.create({data:{
         verificationId:verification.id,category:input.category,documentType:input.documentType,
@@ -116,6 +125,7 @@ export class ListingVerificationService {
     const listing=await this.listing(slug,actor);
     const category:Section=input.category;
     return serialize(await this.prisma.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${listing.id} FOR UPDATE`;
       const record=await tx.listingVerification.findUniqueOrThrow({
         where:{listingId:listing.id},select:{id:true},
       });

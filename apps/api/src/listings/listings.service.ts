@@ -103,6 +103,15 @@ export class ListingsService {
       throw new ForbiddenException("Add a synthetic financial sample before publishing");
     }
     const updated=await this.prisma.$transaction(async tx=>{
+      await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${listing.id} FOR UPDATE`;
+      const [identity,review,financialDocs]=await Promise.all([
+        tx.kycCase.findUnique({where:{userId:actor.id}}),
+        tx.listingVerification.findUnique({where:{listingId:listing.id}}),
+        tx.dataRoomDocument.count({where:{listingId:listing.id,active:true,category:"Financial"}}),
+      ]);
+      if(!identity?.identityVerified || !review?.businessVerified || !review.revenueVerified || !financialDocs){
+        throw new ForbiddenException("Identity, business evidence and a financial sample must be approved");
+      }
       const claimed=await tx.listing.updateMany({
         where:{id:listing.id,status:{in:[ListingStatus.DRAFT,ListingStatus.ARCHIVED]}},
         data:{status:ListingStatus.PUBLISHED},
@@ -131,6 +140,17 @@ export class ListingsService {
     const advisor=await this.prisma.user.findFirst({where:{role:{in:[UserRole.ADVISOR,UserRole.ADMIN]}},orderBy:{createdAt:"asc"}});
     try {
       const deal=await this.prisma.$transaction(async tx=>{
+        await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${listing.id} FOR UPDATE`;
+        const [live,review,sellerIdentity,buyerIdentity]=await Promise.all([
+          tx.listing.findUniqueOrThrow({where:{id:listing.id}}),
+          tx.listingVerification.findUnique({where:{listingId:listing.id}}),
+          tx.kycCase.findUnique({where:{userId:seller.id}}),
+          tx.kycCase.findUnique({where:{userId:actor.id}}),
+        ]);
+        if(live.status!==ListingStatus.PUBLISHED || !review?.businessVerified ||
+           !review.revenueVerified || !sellerIdentity?.identityVerified || !buyerIdentity?.identityVerified){
+          throw new ConflictException("Listing or verification changed; refresh the marketplace");
+        }
         const created=await tx.deal.create({data:{
           ref:`DL-${new Date().getFullYear()}-${randomUUID().slice(0,8).toUpperCase()}`,
           listingId:listing.id,buyerId:actor.id,stage:"NDA_PENDING",

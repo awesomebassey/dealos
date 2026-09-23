@@ -25,6 +25,7 @@ export default async function BusinessVerification({params}:{params:Promise<{slu
     </div>
     <span className={`status ${review.status==="VERIFIED"?"success":""}`}>{sentence(review.status)}</span>
   </div>
+  {result.listing.status==="PUBLISHED"&&<p className="notice" style={{marginBottom:20}}>Submitting replacement evidence pauses this business's public listing until the section is reviewed and you republish it.</p>}
   <div className="grid two" style={{marginBottom:20}}>
     {sections.map(section=>{
       const approved=section.key==="BUSINESS"?review.businessVerified:review.revenueVerified;

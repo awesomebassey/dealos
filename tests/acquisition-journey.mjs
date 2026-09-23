@@ -47,7 +47,7 @@ const sample=(category,documentType)=>({
 });
 const listingPayload=name=>({
   name,category:"Analytics",askingPriceNaira:2_000_000,annualRevenueNaira:1_000_000,
-  recurringRevenuePct:75,customerConcentration:30,revenueTrendPct:7,
+  recurringRevenuePct:75,customerConcentration:45,revenueTrendPct:7,
   ownerHoursPerWeek:15,ipAssigned:true,litigationOpen:false,
 });
 async function ready(child,logs){
@@ -71,12 +71,13 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    if(child.exitCode===null)child.kill("SIGKILL");
  });
  await ready(child,logs);
- const anon=new Client(),advisor=new Client(),buyer=new Client(),seller=new Client(),other=new Client();
+ const anon=new Client(),advisor=new Client(),buyer=new Client(),seller=new Client(),other=new Client(),racer=new Client();
  await advisor.post("/auth/login",{email:"nia@dealos.example",password:demoPassword});
  await other.post("/auth/login",{email:"amara@northstar.capital",password:demoPassword});
- const [buyerUser,sellerUser]=await Promise.all([
+ const [buyerUser,sellerUser,racerUser]=await Promise.all([
    buyer.post("/auth/register",{name:"Example Buyer",email:"new-buyer-"+suffix+"@example.test",password:demoPassword,role:"BUYER"}),
    seller.post("/auth/register",{name:"Example Seller",email:"new-seller-"+suffix+"@example.test",password:demoPassword,role:"SELLER"}),
+   racer.post("/auth/register",{name:"Parallel Buyer",email:"new-racer-"+suffix+"@example.test",password:demoPassword,role:"BUYER"}),
  ]);
  await t.test("100 businesses paginate predictably without duplicate listings",async()=>{
    const pages=[];
@@ -99,14 +100,17 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
  await t.test("registration requires account-level identity approval",async()=>{
    await buyer.post("/kyc/evidence",sample("IDENTITY","DRIVERS_LICENSE"));
    await seller.post("/kyc/evidence",sample("IDENTITY","DRIVERS_LICENSE"));
-   for(const client of [buyer,seller]){
+   await racer.post("/kyc/evidence",sample("IDENTITY","DRIVERS_LICENSE"));
+   for(const client of [buyer,seller,racer]){
      const kyc=await client.get("/kyc/me");
      assert.equal(kyc.identityVerified,false);
      for(const file of kyc.evidence){
        const preview=await advisor.request("GET","/kyc/evidence/"+file.id+"/sample");
        assert.equal(preview.status,200);
+       await other.rejects("GET","/kyc/evidence/"+file.id+"/sample",403);
      }
    }
+   await advisor.post("/kyc/"+racerUser.user.id+"/review",{category:"IDENTITY",approve:true});
    await advisor.post("/kyc/"+buyerUser.user.id+"/review",{category:"IDENTITY",approve:true});
    await advisor.post("/kyc/"+sellerUser.user.id+"/review",{category:"IDENTITY",approve:true});
    const account=await seller.get("/kyc/me");
@@ -156,6 +160,25 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    assert.equal(independent.verification.revenueVerified,false);
    assert.equal((await seller.post("/listings/"+listing.slug+"/publish")).status,"PUBLISHED");
    await seller.rejects("POST","/listings/"+unrelated.slug+"/publish",403);
+   await buyer.rejects("POST","/listing-verification/"+listing.slug+"/evidence",403,sample("BUSINESS","CAC_CERTIFICATE"));
+   await seller.post("/listing-verification/"+listing.slug+"/evidence",sample("BUSINESS","CAC_CERTIFICATE"));
+   assert.equal((await anon.get("/listings?q="+encodeURIComponent("River Analytics "+suffix))).total,0);
+   await buyer.rejects("POST","/listings/"+listing.slug+"/start-deal",404);
+   const pending=await seller.get("/listing-verification/"+listing.slug);
+   const fresh=pending.verification.evidence.find(e=>e.category==="BUSINESS"&&e.status==="SUBMITTED");
+   assert.ok(fresh);
+   assert.equal((await advisor.request("GET","/listing-verification/"+listing.slug+"/evidence/"+fresh.id+"/sample")).status,200);
+   await advisor.post("/listing-verification/"+listing.slug+"/review",{category:"BUSINESS",approve:true});
+   assert.equal((await seller.post("/listings/"+listing.slug+"/publish")).status,"PUBLISHED");
+   // Resubmitting the seller's personal identity must pause public listings too.
+   await seller.post("/kyc/evidence",sample("IDENTITY","VOTERS_CARD"));
+   assert.equal((await anon.get("/listings?q="+encodeURIComponent("River Analytics "+suffix))).total,0);
+   const sellerIdentity=await seller.get("/kyc/me");
+   const replacement=sellerIdentity.evidence.find(e=>e.status==="SUBMITTED");
+   assert.ok(replacement);
+   assert.equal((await advisor.request("GET","/kyc/evidence/"+replacement.id+"/sample")).status,200);
+   await advisor.post("/kyc/"+sellerUser.user.id+"/review",{category:"IDENTITY",approve:true});
+   assert.equal((await seller.post("/listings/"+listing.slug+"/publish")).status,"PUBLISHED");
    const search=await anon.get("/listings?q="+encodeURIComponent("River Analytics "+suffix));
    assert.equal(search.total,1);
  });
@@ -186,11 +209,36 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    await buyer.post("/deals/"+another.id+"/nda/sign");
    await buyer.rejects("POST","/data-room/documents/"+docs[0].id+"/access?dealId="+another.id,403);
  });
+ await t.test("advisor diligence, seller responses and per-acquisition isolation",async()=>{
+   const primary=await advisor.post("/diligence/deals/"+deal.id+"/run");
+   assert.ok(primary.findings.some(f=>f.code==="CUSTOMER_CONCENTRATION"));
+   const question=primary.questions.find(q=>q.question.includes("largest customer"));
+   assert.ok(question);
+   await buyer.rejects("POST","/diligence/deals/"+deal.id+"/questions/"+question.id+"/answer",403,{answer:"Unauthorized answer"});
+   await seller.post("/diligence/deals/"+deal.id+"/questions/"+question.id+"/answer",{
+     answer:"The illustrative largest customer renews annually, with a ninety-day notice period.",
+   });
+   const updated=await buyer.get("/diligence/deals/"+deal.id);
+   assert.match(updated.questions.find(q=>q.id===question.id).answer,/renews annually/);
+   const competitor=await advisor.post("/diligence/deals/"+competing.id+"/run");
+   assert.ok(competitor.questions.length>0);
+   assert.ok(competitor.questions.every(q=>!q.answer),"Seller answers must stay with their acquisition");
+   await buyer.rejects("GET","/diligence/deals/"+competing.id,403);
+ });
  await t.test("offer and explicit advisor escrow creation",async()=>{
    await buyer.post("/offers/deals/"+deal.id,{amountNaira:1_900_000});
    await other.post("/offers/deals/"+competing.id,{amountNaira:1_850_000});
-   assert.equal((await seller.post("/offers/deals/"+deal.id+"/accept")).status,"ACCEPTED");
+   await buyer.rejects("POST","/offers/deals/"+deal.id,409,{amountNaira:1_800_000});
+   const [accepted,raced]=await Promise.all([
+     seller.request("POST","/offers/deals/"+deal.id+"/accept"),
+     racer.request("POST","/listings/"+listing.slug+"/start-deal"),
+   ]);
+   assert.ok(accepted.status>=200&&accepted.status<300,JSON.stringify(accepted.data));
+   assert.equal(accepted.data.status,"ACCEPTED");
+   assert.ok([201,404,409].includes(raced.status),JSON.stringify(raced));
+   if(raced.status===201)assert.equal((await racer.get("/deals/"+raced.data.id)).stage,"WITHDRAWN");
    assert.equal((await other.get("/deals/"+competing.id)).stage,"WITHDRAWN");
+   await seller.rejects("POST","/listing-verification/"+listing.slug+"/evidence",409,sample("REVENUE","BANK_STATEMENT"));
    let current=await advisor.get("/deals/"+deal.id);
    for(const stage of ["FULL_DILIGENCE","SPA"]){
      current=await advisor.post("/deals/"+deal.id+"/transition",{to:stage,expectedVersion:current.version});
@@ -201,6 +249,7 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    const escrow=await advisor.post("/escrow/deals/"+deal.id+"/create");
    assert.equal(escrow.status,"CREATED");
    assert.equal((await advisor.post("/escrow/deals/"+deal.id+"/create")).id,escrow.id);
+   await other.rejects("GET","/escrow/deals/"+deal.id,403);
    current=await advisor.post("/deals/"+deal.id+"/transition",{to:"ESCROW",expectedVersion:current.version});
    assert.equal(current.stage,"ESCROW");
  });
@@ -209,6 +258,7 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    const topup=await buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},key);
    assert.equal((await buyer.post("/wallet/demo-topup",{amountNaira:1_900_000},key)).id,topup.id);
    assert.equal((await buyer.get("/wallet")).balanceMinor,"190000000");
+   await buyer.rejects("POST","/wallet/demo-topup",409,{amountNaira:2000},key);
    const funding=await buyer.post("/escrow/deals/"+deal.id+"/fund",{
      amountMinor:"190000000",provider:"SANDBOX",
    },"fund-"+suffix);
@@ -219,6 +269,7 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    await other.rejects("POST","/escrow/deals/"+deal.id+"/fund",403,{
      amountMinor:"190000000",provider:"SANDBOX",
    },"foreign-"+suffix);
+   await advisor.rejects("POST","/escrow/deals/"+deal.id+"/release",409,undefined,"premature-"+suffix);
    let stage=await advisor.get("/deals/"+deal.id);
    stage=await advisor.post("/deals/"+deal.id+"/transition",{to:"ASSET_TRANSFER",expectedVersion:stage.version});
    stage=await advisor.get("/deals/"+deal.id);

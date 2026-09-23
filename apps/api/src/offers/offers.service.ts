@@ -21,6 +21,18 @@ export class OffersService {
     if(!kyc?.identityVerified) throw new ForbiddenException("Identity verification required");
     try {
       const offer=await this.prisma.$transaction(async tx=>{
+        // Serialize offers with acceptance and new acquisitions on this listing.
+        await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${deal.listingId} FOR UPDATE`;
+        const current=await tx.deal.findUnique({where:{id:dealId},include:{listing:true,ndaAgreements:true}});
+        if(!current || current.buyerId!==actor.id) throw new NotFoundException("Acquisition not found");
+        if(current.stage!==DealStage.DILIGENCE || current.listing.status!==ListingStatus.PUBLISHED){
+          throw new ConflictException("This acquisition is no longer accepting offers");
+        }
+        if(!current.ndaAgreements.some(x=>x.userId===actor.id && x.status==="SIGNED")){
+          throw new ForbiddenException("Signed NDA required");
+        }
+        const freshKyc=await tx.kycCase.findUnique({where:{userId:actor.id}});
+        if(!freshKyc?.identityVerified) throw new ForbiddenException("Identity verification required");
         const created=await tx.acquisitionOffer.create({data:{
           dealId,buyerId:actor.id,amountMinor:BigInt(input.amountNaira)*100n,message:input.message||null,
         }});
@@ -37,10 +49,17 @@ export class OffersService {
 
   async respond(dealId:string,actor:User,accept:boolean) {
     if(actor.role!==UserRole.SELLER) throw new ForbiddenException("Seller account required");
+    const target=await this.prisma.deal.findUnique({where:{id:dealId},select:{listingId:true}});
+    if(!target)throw new NotFoundException("Offer not found");
     return serialize(await this.prisma.$transaction(async tx=>{
+      // Every buyer's accept/decline path shares this listing lock.
+      await tx.$queryRaw`SELECT "id" FROM "Listing" WHERE "id" = ${target.listingId} FOR UPDATE`;
       const deal=await tx.deal.findUnique({where:{id:dealId},include:{listing:true,offer:true}});
       if(!deal || deal.listing.organizationId!==actor.organizationId) throw new NotFoundException("Offer not found");
-      if(!deal.offer || deal.offer.status!==OfferStatus.SUBMITTED) throw new ConflictException("This offer cannot be reviewed");
+      if(!deal.offer || deal.offer.status!==OfferStatus.SUBMITTED ||
+         deal.stage!==DealStage.DILIGENCE || deal.listing.status!==ListingStatus.PUBLISHED){
+        throw new ConflictException("This offer cannot be reviewed");
+      }
       if(accept) {
         const sellerKyc=await tx.kycCase.findUnique({where:{userId:actor.id}});
         const listingReview=await tx.listingVerification.findUnique({where:{listingId:deal.listingId}});
@@ -57,7 +76,14 @@ export class OffersService {
           "Customer contracts and operating records",
           "Intellectual property and brand assets",
         ].map(label=>({dealId,label}))});
-        await tx.deal.updateMany({where:{listingId:deal.listingId,id:{not:dealId},stage:{notIn:[DealStage.COMPLETED,DealStage.WITHDRAWN]}},data:{stage:DealStage.WITHDRAWN,version:{increment:1}}});
+        const competitors=await tx.deal.findMany({
+          where:{listingId:deal.listingId,id:{not:dealId},stage:{notIn:[DealStage.COMPLETED,DealStage.WITHDRAWN]}},
+          select:{id:true},
+        });
+        await tx.deal.updateMany({where:{id:{in:competitors.map(x=>x.id)}},data:{stage:DealStage.WITHDRAWN,version:{increment:1}}});
+        if(competitors.length)await tx.outboxEvent.createMany({data:competitors.map(x=>({
+          topic:"deal.withdrawn",aggregateId:x.id,payload:{dealId:x.id,acceptedDealId:dealId},
+        }))});
         await tx.acquisitionOffer.updateMany({where:{deal:{listingId:deal.listingId},id:{not:deal.offer.id},status:OfferStatus.SUBMITTED},data:{status:OfferStatus.DECLINED,reviewedAt:new Date()}});
       } else {
         await tx.deal.update({where:{id:deal.id},data:{stage:DealStage.WITHDRAWN,version:{increment:1}}});

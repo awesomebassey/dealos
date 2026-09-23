@@ -189,7 +189,12 @@ export async function runCompleteJourney({browser,debuggerOrigin,newPage,until,p
     await buyer.goto("/deals/"+dealId+"/documents");
     assert.ok(await buyer.textIncludes("fabricated-evidence.pdf"),"NDA-controlled financial file not visible");
     await buyer.button("Open");
-    assert.ok(await buyer.textIncludes("Document access granted"));
+    await until(()=>buyer.textIncludes("Document access granted"),"protected document access dialog",15000);
+    const protectedHref=await buyer.eval("document.querySelector('a[href*=\"/api/data-room/documents/\"][href*=\"download\"]')?.getAttribute('href')");
+    assert.ok(protectedHref?.includes("dealId="+dealId),"Document link must belong to the active acquisition");
+    const protectedResponse=await buyer.eval("(async()=>{const r=await fetch("+JSON.stringify(protectedHref)+",{credentials:'include'});return {status:r.status,type:r.headers.get('content-type'),prefix:(await r.text()).slice(0,5)}})()");
+    assert.equal(protectedResponse.status,200,"Signed-in buyer must download the protected sample");
+    assert.equal(protectedResponse.prefix,"%PDF-");
     await buyer.goto("/deals/"+dealId);
     await buyer.fill("#offer-amount","1900000");
     await buyer.button("Submit offer");

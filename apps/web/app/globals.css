@@ -329,6 +329,5 @@ tbody tr:hover { background:#fbfcfa; }
 .deal-tabs a:hover{background:var(--green-soft);color:var(--green-dark)}
 .upload-target{display:grid;place-items:center;gap:12px;padding:30px;border:2px dashed var(--line);background:var(--surface-soft);border-radius:12px;cursor:pointer;text-align:center}
 .upload-target:hover{border-color:var(--green)}
-.warning-panel{border:1px solid #decf99;background:#f8f3e5;padding:17px;border-radius:10px;color:#65511c;font-size:13px;line-height:1.6}
 @media(max-width:1000px){.market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:660px){.market-grid{grid-template-columns:1fr}}

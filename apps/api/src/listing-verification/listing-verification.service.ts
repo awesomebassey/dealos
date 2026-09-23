@@ -59,7 +59,7 @@ export class ListingVerificationService {
   }
 
   async submit(slug:string,actor:User,body:unknown){
-    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED==="false")throw new ForbiddenException("Sample submissions are unavailable");
+    if(process.env.DEALOS_DEMO_VERIFICATION_ENABLED !== "true")throw new ForbiddenException("Sample submissions are unavailable");
     const listing=await this.listing(slug,actor,true);
     const input=evidenceUploadSchema.parse(body);
     if(input.category!==EvidenceCategory.BUSINESS&&input.category!==EvidenceCategory.REVENUE){

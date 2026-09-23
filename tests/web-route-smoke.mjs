@@ -111,6 +111,7 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   assert.ok(escrow);
   await page("/deals/"+escrow.id+"/escrow",buyerCookie);
   await page("/kyc",buyerCookie);
+  await page("/kyc/identity",buyerCookie);
   const wallet=await page("/wallet",buyerCookie);
   assert.ok(wallet.includes("Demo wallet"));
 
@@ -118,9 +119,11 @@ test("web routes render across the real API for 100 seeded businesses",{timeout:
   const sellerListings=await page("/my-listings",sellerCookie);
   assert.ok(sellerListings.includes("KoraMetrics"));
   await page("/my-listings/korametrics",sellerCookie);
+  await page("/my-listings/korametrics/verification",sellerCookie);
   await page("/kyc",sellerCookie);
   const advisorCookie=await login("nia@dealos.example");
   await page("/reviews",advisorCookie);
+  await page("/reviews/businesses/korametrics",advisorCookie);
 
   const withoutSession=await fetch(webOrigin+"/dashboard",{redirect:"manual"});
   assert.ok([302,303,307,308].includes(withoutSession.status),

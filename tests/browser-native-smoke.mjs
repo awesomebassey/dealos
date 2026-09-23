@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {runCompleteJourney} from "./browser-complete-journey.mjs";
 import {spawn} from "node:child_process";
 import {existsSync} from "node:fs";
 import {mkdtemp,rm} from "node:fs/promises";
@@ -226,6 +227,7 @@ export async function runNativeBrowserSmoke(){
     assert.ok(overflow<=2,"Mobile marketplace horizontal overflow: "+overflow+"px");
     assert.ok(await buyer.textIncludes("Find your next business"),"Mobile marketplace inaccessible");
     console.log("PASS: Chromium buyer actions, seller workspace, advisor diligence and mobile layout");
+    await runCompleteJourney({browser,debuggerOrigin,newPage,until,password});
     buyer.cdp.close();seller.cdp.close();advisor.cdp.close();
   }finally{
     browser?.close();

@@ -78,6 +78,24 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    buyer.post("/auth/register",{name:"Example Buyer",email:"new-buyer-"+suffix+"@example.test",password:demoPassword,role:"BUYER"}),
    seller.post("/auth/register",{name:"Example Seller",email:"new-seller-"+suffix+"@example.test",password:demoPassword,role:"SELLER"}),
  ]);
+ await t.test("100 businesses paginate predictably without duplicate listings",async()=>{
+   const pages=[];
+   for(let page=1;page<=9;page++){
+     const result=await anon.get("/listings?page="+page);
+     assert.equal(result.total,100);
+     assert.equal(result.page,page);
+     assert.equal(result.pages,9);
+     assert.equal(result.items.length,page===9?4:12);
+     pages.push(...result.items);
+   }
+   assert.equal(pages.length,100);
+   assert.equal(new Set(pages.map(listing=>listing.id)).size,100);
+   const noResults=await anon.get("/listings?page=10");
+   assert.equal(noResults.items.length,0);
+   const filter=await anon.get("/listings?q=KoraMetrics");
+   assert.equal(filter.total,1);
+   assert.equal(filter.items[0].slug,"korametrics");
+ });
  await t.test("registration requires account-level identity approval",async()=>{
    await buyer.post("/kyc/evidence",sample("IDENTITY","DRIVERS_LICENSE"));
    await seller.post("/kyc/evidence",sample("IDENTITY","DRIVERS_LICENSE"));
@@ -94,6 +112,14 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    const account=await seller.get("/kyc/me");
    assert.equal(account.identityVerified,true);
    assert.equal(account.businessVerified,false);
+ });
+ await t.test("concurrent acquisition retries return a single deal",async()=>{
+   const [first,second]=await Promise.all([
+     buyer.post("/listings/sample-business-002/start-deal"),
+     buyer.post("/listings/sample-business-002/start-deal"),
+   ]);
+   assert.equal(first.id,second.id);
+   assert.equal(first.listingId,second.listingId);
  });
  let listing,deal,competing;
  await t.test("each business requires an independent registration and revenue review",async()=>{
@@ -139,6 +165,7 @@ test("full multi-business acquisition and settlement",{timeout:120_000},async t=
    assert.notEqual(deal.id,competing.id);
    assert.equal((await buyer.post("/listings/"+listing.slug+"/start-deal")).id,deal.id);
    await buyer.rejects("GET","/data-room/deals/"+deal.id+"/documents",403);
+   await other.rejects("GET","/data-room/deals/"+deal.id+"/documents",403);
    await buyer.post("/deals/"+deal.id+"/nda/sign");
    await other.post("/deals/"+competing.id+"/nda/sign");
    const docs=await buyer.get("/data-room/deals/"+deal.id+"/documents");

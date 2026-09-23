@@ -31,6 +31,7 @@ jobs:
       DEALOS_DEMO_FINANCE_ENABLED: "true"
       DEALOS_ALLOW_DESTRUCTIVE_SEED: "true"
       DEALOS_SEED_LISTING_COUNT: "100"
+      DEALOS_SMOKE_DEMO_PASSWORD: "DealOS2026!"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

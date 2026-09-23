@@ -15,7 +15,7 @@
     "db:seed": "npm run seed -w @dealos/db",
     "db:push": "npm run push -w @dealos/db",
     "test:static": "node --test tests/*.test.mjs",
-    "test:smoke": "node --test tests/marketplace-smoke.mjs",
+    "test:smoke": "node --test tests/acquisition-journey.mjs",
     "db:deploy": "npm run migrate:deploy -w @dealos/db",
     "auth:bootstrap-reviewer": "node --env-file-if-exists=.env scripts/create-reviewer.mjs",
     "test:web-smoke": "node --test tests/web-route-smoke.mjs"
